@@ -698,20 +698,24 @@ function parseCSVListeTechnique(csvText) {
     console.log('En-têtes:', headers);
 
     // Trouver indices des colonnes
-    // Détecter colonne combinée "Nom_Prénom" ou "Nom Prénom" ou "prenom nom" etc.
+    // Détecter colonne combinée "Nom_Prénom" ou "Nom complet" ou "Nom Prénom" etc.
     let nomPrenomIndex = headers.findIndex(h =>
         (h.includes('nom') && h.includes('prenom')) ||
         h.includes('nom_prenom') ||
         h.includes('prenom_nom') ||
         h.includes('prénom_nom') ||
-        h.includes('nom_prénom')
+        h.includes('nom_prénom') ||
+        h.includes('nom complet') ||
+        h.includes('nom_complet') ||
+        h.includes('nomcomplet') ||
+        (h.includes('nom') && h.includes('complet'))
     );
 
     let nomIndex = headers.findIndex(h => h === 'nom');
     let prenomIndex = headers.findIndex(h => h === 'prenom' || h === 'prénom');
     let deptIndex = headers.findIndex(h => h.includes('departement') || h.includes('département') || h.includes('dept'));
     let posteIndex = headers.findIndex(h => h.includes('poste') || h.includes('fonction'));
-    let qrIndex = headers.findIndex(h => h.includes('qr') || h.includes('code'));
+    let qrIndex = headers.findIndex(h => h.includes('qr') || h.includes('code') || h.includes('#qr'));
 
     console.log('Indices:', { nomPrenomIndex, nomIndex, prenomIndex, deptIndex, posteIndex, qrIndex });
 
