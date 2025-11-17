@@ -25,6 +25,7 @@ let listeTechnique = [];
 let lastScanTime = 0;
 let currentEditId = null;
 let modalCategory = null;
+let scanModeActive = true; // Mode scan activé par défaut
 
 // ========== UTILITAIRES ==========
 function generateId() {
@@ -238,120 +239,74 @@ function handleScanInput(e) {
 function processScan(value) {
     console.log('Scan détecté:', value);
 
-    // Détection du type de badge (commence par ou contient le mot-clé)
+    // Détection du type de badge (correspondance exacte pour les modals)
 
-    // FIGURANT
+    // FIGURANT - Incrémente directement
     if (value === 'FIGURANT' || value.startsWith('FIGURANT')) {
         incrementFigurant();
         showToast('✅ Figurant ajouté');
         return;
     }
 
-    // RENFORT : "RENFORT NOM PRENOM DÉPARTEMENT"
-    if (value.startsWith('RENFORT')) {
-        handleRenfortScan(value);
+    // RENFORT - Ouvre modal vide
+    if (value === 'RENFORT' || value.startsWith('RENFORT')) {
+        openScanModal('renforts');
         return;
     }
 
-    // INVITE : "INVITE NOM PRENOM"
-    if (value.startsWith('INVITE')) {
-        handleInviteScan(value);
+    // INVITE - Ouvre modal vide
+    if (value === 'INVITE' || value.startsWith('INVITE')) {
+        openScanModal('invites');
         return;
     }
 
-    // SECURITE ou SÉCURITÉ : "SÉCURITÉ NOM PRÉNOM"
-    if (value.startsWith('SECURITE') || value.startsWith('SÉCURITÉ')) {
-        handleSecuriteScan(value);
+    // SECURITE ou SÉCURITÉ - Ouvre modal vide
+    if (value === 'SECURITE' || value === 'SÉCURITÉ' || value.startsWith('SECURITE') || value.startsWith('SÉCURITÉ')) {
+        openScanModal('securite');
         return;
     }
 
-    // CANTINE : "CANTINE" ou "CANTINE NOM"
-    if (value.startsWith('CANTINE')) {
-        handleCantineScan(value);
+    // CANTINE - Ouvre modal vide
+    if (value === 'CANTINE' || value.startsWith('CANTINE')) {
+        openScanModal('cantine');
         return;
     }
 
-    // Sinon : Format équipe "Prénom NOM DÉPARTEMENT"
+    // Sinon : Format équipe - Scanner de la liste technique
     handleEquipeScan(value);
 }
 
-function handleRenfortScan(value) {
-    // Format: "RENFORT NOM PRENOM DÉPARTEMENT"
-    // Retirer "RENFORT" et parser le reste
-    const data = value.replace(/^RENFORT\s*/i, '').trim();
-    const parts = data.split(' ').filter(p => p.trim());
-
-    if (parts.length >= 2) {
-        const prenom = parts[0];
-        const nom = parts[1];
-        const dept = parts.slice(2).join(' ');
-
-        // Pré-remplir le modal
-        openScanModalWithData('renforts', { nom, prenom, departement: dept });
-    } else {
-        // Pas assez de données, ouvrir modal vide
-        openScanModal('renforts');
-    }
-}
-
-function handleInviteScan(value) {
-    // Format: "INVITE NOM PRENOM"
-    const data = value.replace(/^INVITE\s*/i, '').trim();
-    const parts = data.split(' ').filter(p => p.trim());
-
-    if (parts.length >= 2) {
-        const prenom = parts[0];
-        const nom = parts.slice(1).join(' ');
-
-        // Pré-remplir le modal
-        openScanModalWithData('invites', { nom, prenom });
-    } else {
-        openScanModal('invites');
-    }
-}
-
-function handleSecuriteScan(value) {
-    // Format: "SÉCURITÉ NOM PRÉNOM" ou "SECURITE NOM PRENOM"
-    const data = value.replace(/^(SECURITE|SÉCURITÉ)\s*/i, '').trim();
-    const parts = data.split(' ').filter(p => p.trim());
-
-    if (parts.length >= 2) {
-        const prenom = parts[0];
-        const nom = parts.slice(1).join(' ');
-
-        // Pré-remplir le modal
-        openScanModalWithData('securite', { nom, prenom });
-    } else {
-        openScanModal('securite');
-    }
-}
-
-function handleCantineScan(value) {
-    // Format: "CANTINE" ou "CANTINE NOM"
-    const data = value.replace(/^CANTINE\s*/i, '').trim();
-
-    if (data) {
-        // Il y a un nom
-        openScanModalWithData('cantine', { nom: data });
-    } else {
-        // Juste "CANTINE", modal vide
-        openScanModal('cantine');
-    }
-}
-
 function handleEquipeScan(value) {
-    const parts = value.split(' ');
-    if (parts.length < 2) {
-        showToast('⚠️ Format de badge non reconnu', true);
-        return;
-    }
+    console.log('Scan équipe:', value);
 
-    // Essayer de trouver dans la liste technique
-    const person = listeTechnique.find(p =>
-        value.includes(p.nom.toUpperCase()) && value.includes(p.prenom.toUpperCase())
-    );
+    // Essayer de matcher avec le QR code de la liste technique
+    let person = listeTechnique.find(p => {
+        // Comparaison exacte avec qrCode
+        if (p.qrCode && p.qrCode.toUpperCase() === value) {
+            return true;
+        }
+        // Comparaison flexible : le scan contient nom ET prénom
+        const nomUpper = p.nom.toUpperCase();
+        const prenomUpper = p.prenom.toUpperCase();
+        return value.includes(nomUpper) && value.includes(prenomUpper);
+    });
 
     if (person) {
+        console.log('✅ Trouvé dans liste technique:', person.prenom, person.nom);
+
+        // Vérifier si déjà pointé
+        const pointages = getPointagesForDate(currentWorkingDate);
+        const alreadyPointed = pointages.some(p =>
+            p.nom === person.nom &&
+            p.prenom === person.prenom &&
+            p.categorie === CONFIG.CATEGORIES.EQUIPE
+        );
+
+        if (alreadyPointed) {
+            showToast(`⚠️ ${person.prenom} ${person.nom} déjà pointé(e)`, true);
+            return;
+        }
+
         addPointage({
             categorie: CONFIG.CATEGORIES.EQUIPE,
             nom: person.nom,
@@ -363,14 +318,26 @@ function handleEquipeScan(value) {
             origine: 'qr'
         });
     } else {
-        // Extraire nom/prénom du scan
+        console.log('❌ Non trouvé dans liste technique');
+
+        // Parser le scan pour extraire les données
+        const parts = value.split(' ').filter(p => p.trim());
+
+        if (parts.length < 2) {
+            showToast('⚠️ Format de badge non reconnu', true);
+            return;
+        }
+
+        // Premier mot = prénom, deuxième = nom (ou plus si nom composé)
         const prenom = parts[0];
-        const nom = parts.slice(1, parts.findIndex(p => p === p.toUpperCase())).join(' ') || parts[1];
+        const nom = parts[1];
         const dept = parts.slice(2).join(' ');
+
+        console.log('Ajout scan brut:', { prenom, nom, dept });
 
         addPointage({
             categorie: CONFIG.CATEGORIES.EQUIPE,
-            nom: nom,
+            nom: nom.toUpperCase(),
             prenom: prenom,
             departement: dept,
             poste: '',
@@ -1118,11 +1085,39 @@ function toggleTheme() {
 
 // ========== FOCUS MANAGEMENT ==========
 function refocusScannerInput() {
+    // Ne refocus que si mode scan activé
+    if (!scanModeActive) return;
+
     const modal = document.getElementById('inputModal');
     if (!modal.classList.contains('active')) {
         setTimeout(() => {
             document.getElementById('qrInput').focus();
         }, 100);
+    }
+}
+
+function toggleScanMode() {
+    scanModeActive = !scanModeActive;
+
+    const btn = document.getElementById('scanModeToggle');
+    const scanStatus = document.getElementById('scanStatus');
+
+    if (scanModeActive) {
+        btn.textContent = '📷 Mode Scan';
+        btn.classList.add('active');
+        scanStatus.textContent = '✓ Mode scan activé';
+        scanStatus.style.color = 'var(--accent)';
+        // Refocus immédiatement
+        refocusScannerInput();
+        showToast('✅ Mode scan activé');
+    } else {
+        btn.textContent = '✋ Mode Manuel';
+        btn.classList.remove('active');
+        scanStatus.textContent = '✓ Mode manuel activé';
+        scanStatus.style.color = 'var(--text-secondary)';
+        // Blur l'input pour ne plus recevoir les scans
+        document.getElementById('qrInput').blur();
+        showToast('✅ Mode manuel activé');
     }
 }
 
@@ -1190,6 +1185,11 @@ function init() {
 
     // Render initial
     renderAll();
+
+    // Initialiser le mode scan (message de statut)
+    const scanStatus = document.getElementById('scanStatus');
+    scanStatus.textContent = '✓ Mode scan activé';
+    scanStatus.style.color = 'var(--accent)';
 
     // Focus initial
     refocusScannerInput();
