@@ -698,10 +698,18 @@ function parseCSVListeTechnique(csvText) {
     console.log('En-têtes:', headers);
 
     // Trouver indices des colonnes
-    let nomPrenomIndex = headers.findIndex(h => h.includes('nom') && h.includes('prenom'));
-    let nomIndex = headers.findIndex(h => h.match(/^nom$/i));
-    let prenomIndex = headers.findIndex(h => h.match(/^prenom$/i));
-    let deptIndex = headers.findIndex(h => h.includes('departement') || h.includes('dept'));
+    // Détecter colonne combinée "Nom_Prénom" ou "Nom Prénom" ou "prenom nom" etc.
+    let nomPrenomIndex = headers.findIndex(h =>
+        (h.includes('nom') && h.includes('prenom')) ||
+        h.includes('nom_prenom') ||
+        h.includes('prenom_nom') ||
+        h.includes('prénom_nom') ||
+        h.includes('nom_prénom')
+    );
+
+    let nomIndex = headers.findIndex(h => h === 'nom');
+    let prenomIndex = headers.findIndex(h => h === 'prenom' || h === 'prénom');
+    let deptIndex = headers.findIndex(h => h.includes('departement') || h.includes('département') || h.includes('dept'));
     let posteIndex = headers.findIndex(h => h.includes('poste') || h.includes('fonction'));
     let qrIndex = headers.findIndex(h => h.includes('qr') || h.includes('code'));
 
@@ -711,29 +719,50 @@ function parseCSVListeTechnique(csvText) {
 
     // Parser chaque ligne
     for (let i = 1; i < lines.length; i++) {
-        const columns = lines[i].split(separator).map(c => c.trim());
+        const line = lines[i];
+        if (!line.trim()) continue; // Ignorer lignes vides
 
-        let nom, prenom, departement, poste, qrCode;
+        const columns = line.split(separator).map(c => c.trim());
+        console.log(`Ligne ${i}:`, columns);
+
+        let nom = '';
+        let prenom = '';
+        let departement = '';
+        let poste = '';
+        let qrCode = '';
 
         // Extraire nom/prénom
-        if (nomPrenomIndex >= 0) {
-            // Format "Prénom NOM" dans une colonne
-            const parts = columns[nomPrenomIndex].split(' ');
+        if (nomPrenomIndex >= 0 && columns[nomPrenomIndex]) {
+            // Format "Prénom NOM" ou "Romain LE GRAND" dans une colonne
+            const fullName = columns[nomPrenomIndex];
+            const parts = fullName.split(' ').filter(p => p.trim());
+
             if (parts.length >= 2) {
+                // Premier mot = prénom, reste = nom
                 prenom = parts[0];
                 nom = parts.slice(1).join(' ');
+            } else if (parts.length === 1) {
+                // Un seul mot, on le met dans nom
+                nom = parts[0];
+                prenom = nom; // On duplique pour passer la validation
             }
         } else {
             // Colonnes séparées
-            nom = nomIndex >= 0 ? columns[nomIndex] : '';
-            prenom = prenomIndex >= 0 ? columns[prenomIndex] : '';
+            nom = nomIndex >= 0 && columns[nomIndex] ? columns[nomIndex] : '';
+            prenom = prenomIndex >= 0 && columns[prenomIndex] ? columns[prenomIndex] : '';
         }
 
-        departement = deptIndex >= 0 ? columns[deptIndex] : '';
-        poste = posteIndex >= 0 ? columns[posteIndex] : '';
-        qrCode = qrIndex >= 0 ? columns[qrIndex] : `${prenom} ${nom} ${departement}`.trim();
+        departement = deptIndex >= 0 && columns[deptIndex] ? columns[deptIndex] : '';
+        poste = posteIndex >= 0 && columns[posteIndex] ? columns[posteIndex] : '';
+        qrCode = qrIndex >= 0 && columns[qrIndex] ? columns[qrIndex] : `${prenom} ${nom} ${departement}`.trim();
 
-        if (nom && prenom) {
+        // Validation plus permissive : au moins un nom OU un prénom
+        if (nom || prenom) {
+            // Si seulement l'un des deux, copier dans l'autre
+            if (!nom && prenom) nom = prenom;
+            if (!prenom && nom) prenom = nom;
+
+            console.log(`✅ Ajout: ${prenom} ${nom}`);
             data.push({
                 nom: nom.toUpperCase(),
                 prenom: prenom,
@@ -743,6 +772,8 @@ function parseCSVListeTechnique(csvText) {
                 categorie: 'equipe',
                 societe: null
             });
+        } else {
+            console.log(`❌ Ignoré (pas de nom/prénom):`, columns);
         }
     }
 
