@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="KRAKEN">
+    <meta name="theme-color" content="#0088ff">
+    <title>KRAKEN - Pointage Cantine</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='80'>🎬</text></svg>">
+
+    <style>
+        /* ========== RESET & BASE ========== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* ========== CSS VARIABLES ========== */
+        :root {
+            /* Colors */
+            --accent: #0088ff;
+            --accent-hover: #0066cc;
+            --accent-soft: rgba(0, 136, 255, 0.1);
+
+            /* Dark theme (default) */
+            --bg-primary: #121212;
+            --bg-secondary: #1e1e1e;
+            --bg-card: #2a2a2a;
+            --text-primary: #ffffff;
+            --text-secondary: #b0b0b0;
+            --border: #3a3a3a;
+
+            /* Semantic colors */
+            --success: #00cc66;
+            --error: #ff4444;
+            --warning: #ffaa00;
+
+            /* Spacing */
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 12px;
+            --spacing-lg: 16px;
+            --spacing-xl: 24px;
+
+            /* Border radius */
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+        }
+
+        body.light-theme {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --bg-card: #ffffff;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --border: #e0e0e0;
+        }
+
+        /* ========== GLOBAL STYLES ========== */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow-x: hidden;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        /* ========== ACCESSIBILITY ========== */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border-width: 0;
+        }
+
+        /* ========== HEADER ========== */
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: var(--spacing-lg);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .header-title {
+            font-size: 24px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+        }
+
+        .theme-toggle {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-sm) var(--spacing-md);
+            cursor: pointer;
+            font-size: 20px;
+            transition: all 0.2s;
+        }
+
+        .theme-toggle:hover {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+        }
+
+        .date-section {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .date-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .date-input {
+            width: 100%;
+            padding: var(--spacing-md);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 16px;
+            font-family: inherit;
+        }
+
+        .date-input:focus {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--spacing-md);
+        }
+
+        .stat-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        /* ========== SCANNER INPUT ========== */
+        .scanner-section {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: var(--spacing-lg);
+        }
+
+        .scanner-input {
+            width: 100%;
+            padding: var(--spacing-lg);
+            background: var(--bg-card);
+            border: 2px solid var(--accent);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 16px;
+            font-family: inherit;
+            text-align: center;
+        }
+
+        .scanner-input:focus {
+            outline: none;
+            border-color: var(--accent-hover);
+            box-shadow: 0 0 0 4px var(--accent-soft);
+        }
+
+        .scan-status {
+            margin-top: var(--spacing-sm);
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-align: center;
+            min-height: 20px;
+        }
+
+        .scan-status.active {
+            color: var(--accent);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* ========== TABS ========== */
+        .tabs {
+            display: flex;
+            overflow-x: auto;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tab {
+            flex: 1;
+            min-width: 120px;
+            padding: var(--spacing-lg);
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            background: var(--accent-soft);
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        /* ========== TAB CONTENT ========== */
+        .tab-content {
+            display: none;
+            padding: var(--spacing-lg);
+        }
+
+        .tab-content[aria-hidden="false"] {
+            display: block;
+        }
+
+        /* ========== DEPARTMENT GROUPS (ÉQUIPE) ========== */
+        .dept-group {
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .dept-header {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--accent);
+            padding: var(--spacing-md);
+            background: var(--accent-soft);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .name-list {
+            list-style: none;
+        }
+
+        .name-list li {
+            padding: var(--spacing-md);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            margin-bottom: var(--spacing-sm);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            transition: all 0.2s;
+            min-height: 44px;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .name-list li:hover {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+        }
+
+        .name-list li.checked {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+        }
+
+        .check-icon {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .name-list li.checked .check-icon {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        /* ========== EXTRA LISTS (RENFORTS, INVITÉS, etc.) ========== */
+        .add-manual-btn {
+            width: 100%;
+            padding: var(--spacing-md);
+            background: var(--accent-soft);
+            border: 1px solid var(--accent);
+            border-radius: var(--radius-md);
+            color: var(--accent);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: var(--spacing-lg);
+            min-height: 44px;
+        }
+
+        .add-manual-btn:hover {
+            background: var(--accent);
+            color: white;
+        }
+
+        .extra-list {
+            list-style: none;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .extra-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-sm);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: var(--spacing-md);
+            min-height: 44px;
+        }
+
+        .extra-content {
+            flex: 1;
+        }
+
+        .extra-name {
+            font-weight: 600;
+            font-size: 16px;
+            display: block;
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .extra-detail {
+            font-size: 14px;
+            color: var(--text-secondary);
+            display: block;
+        }
+
+        .extra-actions {
+            display: flex;
+            gap: var(--spacing-sm);
+        }
+
+        .extra-edit-btn,
+        .extra-delete-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: var(--spacing-sm);
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 44px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .extra-edit-btn:hover {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+        }
+
+        .extra-delete-btn:hover {
+            background: rgba(255, 68, 68, 0.1);
+            border-color: var(--error);
+        }
+
+        .category-total {
+            text-align: center;
+            padding: var(--spacing-md);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: var(--spacing-xl);
+            color: var(--text-secondary);
+        }
+
+        /* ========== FIGURANTS COUNTER ========== */
+        .figurant-counter {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+        }
+
+        .figurant-display {
+            text-align: center;
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .figurant-number {
+            font-size: 72px;
+            font-weight: 700;
+            color: var(--accent);
+            line-height: 1;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .figurant-label {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .figurant-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .figurant-btn {
+            padding: var(--spacing-lg);
+            font-size: 32px;
+            font-weight: 700;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            min-height: 64px;
+        }
+
+        .figurant-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .figurant-btn:active {
+            transform: translateY(0);
+        }
+
+        .figurant-minus:hover {
+            background: rgba(255, 68, 68, 0.1);
+            border-color: var(--error);
+            color: var(--error);
+        }
+
+        .figurant-plus:hover {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .figurant-note {
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* ========== MODALS ========== */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-lg);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: transparent;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-close:hover {
+            color: var(--text-primary);
+        }
+
+        .form-group {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .form-group.hidden {
+            display: none;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .form-label.required::after {
+            content: ' *';
+            color: var(--error);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: var(--spacing-md);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 16px;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .modal-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-xl);
+        }
+
+        .btn {
+            padding: var(--spacing-md) var(--spacing-xl);
+            border-radius: var(--radius-md);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            min-height: 44px;
+        }
+
+        .btn-cancel {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+
+        .btn-cancel:hover {
+            background: var(--bg-secondary);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+        }
+
+        /* ========== EXPORT SECTION ========== */
+        .export-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+        }
+
+        .export-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .date-range {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .btn-export {
+            width: 100%;
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-export:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 136, 255, 0.3);
+        }
+
+        /* ========== ACTIONS SECTION ========== */
+        .actions-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            margin-top: var(--spacing-lg);
+        }
+
+        .actions-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .actions-grid {
+            display: grid;
+            gap: var(--spacing-md);
+        }
+
+        .btn-action {
+            width: 100%;
+            padding: var(--spacing-lg);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 44px;
+        }
+
+        .btn-action:hover {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+        }
+
+        .btn-danger {
+            background: rgba(255, 68, 68, 0.1);
+            border-color: var(--error);
+            color: var(--error);
+        }
+
+        .btn-danger:hover {
+            background: var(--error);
+            color: white;
+        }
+
+        /* ========== TOAST NOTIFICATIONS ========== */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-lg) var(--spacing-xl);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            z-index: 2000;
+            opacity: 0;
+            transition: all 0.3s;
+            max-width: 90%;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast.error {
+            background: var(--error);
+            color: white;
+            border-color: var(--error);
+        }
+
+        /* ========== FILE INPUT ========== */
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            display: block;
+            width: 100%;
+            padding: var(--spacing-lg);
+            background: var(--accent-soft);
+            border: 2px dashed var(--accent);
+            border-radius: var(--radius-md);
+            color: var(--accent);
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .file-label:hover {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* ========== RESPONSIVE ========== */
+        @media (min-width: 768px) {
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+
+            .header {
+                padding: var(--spacing-xl);
+            }
+
+            .stats {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .figurant-number {
+                font-size: 96px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- HEADER -->
+    <header class="header">
+        <div class="header-top">
+            <h1 class="header-title">
+                <span>🎬</span>
+                <span>KRAKEN</span>
+            </h1>
+            <button class="theme-toggle" onclick="toggleTheme()" aria-label="Changer le thème">
+                🌙
+            </button>
+        </div>
+
+        <div class="date-section">
+            <label for="workingDate" class="date-label">Date de travail</label>
+            <input type="date" id="workingDate" class="date-input" aria-label="Date de travail">
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">Équipe</div>
+                <div class="stat-value" id="statsEquipe" aria-live="polite">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Figurants</div>
+                <div class="stat-value" id="statsFigurants" aria-live="polite">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Total</div>
+                <div class="stat-value" id="statsTotal" aria-live="polite">0</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- SCANNER INPUT -->
+    <section class="scanner-section">
+        <input type="text"
+               id="qrInput"
+               class="scanner-input"
+               placeholder="Scannez un badge QR..."
+               autocomplete="off"
+               aria-label="Scanner de badge QR">
+        <div class="scan-status" id="scanStatus"></div>
+    </section>
+
+    <!-- TABS -->
+    <div class="tabs" role="tablist">
+        <button class="tab active"
+                role="tab"
+                data-tab="equipe"
+                aria-selected="true"
+                aria-controls="tab-equipe"
+                id="tab-btn-equipe">
+            Équipe
+        </button>
+        <button class="tab"
+                role="tab"
+                data-tab="renforts"
+                aria-selected="false"
+                aria-controls="tab-renforts"
+                id="tab-btn-renforts">
+            Renforts
+        </button>
+        <button class="tab"
+                role="tab"
+                data-tab="invites"
+                aria-selected="false"
+                aria-controls="tab-invites"
+                id="tab-btn-invites">
+            Invités
+        </button>
+        <button class="tab"
+                role="tab"
+                data-tab="securite"
+                aria-selected="false"
+                aria-controls="tab-securite"
+                id="tab-btn-securite">
+            Sécurité
+        </button>
+        <button class="tab"
+                role="tab"
+                data-tab="cantine"
+                aria-selected="false"
+                aria-controls="tab-cantine"
+                id="tab-btn-cantine">
+            Cantine
+        </button>
+        <button class="tab"
+                role="tab"
+                data-tab="figurants"
+                aria-selected="false"
+                aria-controls="tab-figurants"
+                id="tab-btn-figurants">
+            Figurants
+        </button>
+    </div>
+
+    <!-- TAB CONTENTS -->
+    <div class="tab-content" role="tabpanel" id="tab-equipe" aria-labelledby="tab-btn-equipe" aria-hidden="false">
+        <label for="csvFileInput" class="file-label">
+            📋 Charger la liste technique (CSV)
+        </label>
+        <input type="file" id="csvFileInput" class="file-input" accept=".csv">
+
+        <div id="equipeList"></div>
+    </div>
+
+    <div class="tab-content" role="tabpanel" id="tab-renforts" aria-labelledby="tab-btn-renforts" aria-hidden="true">
+        <button class="add-manual-btn" onclick="openManualModal('renforts')">
+            + Ajouter un renfort
+        </button>
+        <ul class="extra-list" id="renfortsList"></ul>
+        <div class="category-total" id="renfortsTotal">Total : 0</div>
+    </div>
+
+    <div class="tab-content" role="tabpanel" id="tab-invites" aria-labelledby="tab-btn-invites" aria-hidden="true">
+        <button class="add-manual-btn" onclick="openManualModal('invites')">
+            + Ajouter un invité
+        </button>
+        <ul class="extra-list" id="invitesList"></ul>
+        <div class="category-total" id="invitesTotal">Total : 0</div>
+    </div>
+
+    <div class="tab-content" role="tabpanel" id="tab-securite" aria-labelledby="tab-btn-securite" aria-hidden="true">
+        <button class="add-manual-btn" onclick="openManualModal('securite')">
+            + Ajouter sécurité
+        </button>
+        <ul class="extra-list" id="securiteList"></ul>
+        <div class="category-total" id="securiteTotal">Total : 0</div>
+    </div>
+
+    <div class="tab-content" role="tabpanel" id="tab-cantine" aria-labelledby="tab-btn-cantine" aria-hidden="true">
+        <button class="add-manual-btn" onclick="openManualModal('cantine')">
+            + Ajouter cantine
+        </button>
+        <ul class="extra-list" id="cantineList"></ul>
+        <div class="category-total" id="cantineTotal">Total : 0</div>
+    </div>
+
+    <div class="tab-content" role="tabpanel" id="tab-figurants" aria-labelledby="tab-btn-figurants" aria-hidden="true">
+        <div class="figurant-counter">
+            <div class="figurant-display">
+                <div class="figurant-number" id="figurantCount">0</div>
+                <div class="figurant-label">FIGURANT(S)</div>
+            </div>
+            <div class="figurant-controls">
+                <button class="figurant-btn figurant-minus" onclick="decrementFigurant()" aria-label="Diminuer le nombre de figurants">
+                    −
+                </button>
+                <button class="figurant-btn figurant-plus" onclick="incrementFigurant()" aria-label="Augmenter le nombre de figurants">
+                    +
+                </button>
+            </div>
+            <p class="figurant-note">Scannez un badge FIGURANT ou utilisez +/−</p>
+        </div>
+
+        <div class="export-section" style="margin-top: 24px;">
+            <h3 class="export-title">📊 Export CSV</h3>
+            <div class="date-range">
+                <div class="form-group">
+                    <label for="exportFromDate" class="form-label">Du</label>
+                    <input type="date" id="exportFromDate" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="exportToDate" class="form-label">Au</label>
+                    <input type="date" id="exportToDate" class="form-input">
+                </div>
+            </div>
+            <button class="btn btn-export" onclick="exportCSV()">
+                Télécharger CSV
+            </button>
+        </div>
+
+        <div class="actions-section">
+            <h3 class="actions-title">⚙️ Actions</h3>
+            <div class="actions-grid">
+                <button class="btn-action" onclick="resetCurrentDay()">
+                    🔄 Réinitialiser ce jour
+                </button>
+                <button class="btn-action btn-danger" onclick="resetAllData()">
+                    ⚠️ Réinitialiser toutes les données
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL SAISIE -->
+    <div class="modal" id="inputModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Ajouter</h2>
+                <button class="modal-close" onclick="closeInputModal()" aria-label="Fermer">×</button>
+            </div>
+
+            <div class="form-group" id="nomGroup">
+                <label for="modalNom" class="form-label" id="nomLabel">Nom</label>
+                <input type="text" id="modalNom" class="form-input" placeholder="NOM" autocomplete="off">
+            </div>
+
+            <div class="form-group hidden" id="prenomGroup">
+                <label for="modalPrenom" class="form-label" id="prenomLabel">Prénom</label>
+                <input type="text" id="modalPrenom" class="form-input" placeholder="Prénom" autocomplete="off">
+            </div>
+
+            <div class="form-group hidden" id="deptGroup">
+                <label for="modalDept" class="form-label">Département</label>
+                <input type="text" id="modalDept" class="form-input" placeholder="Département" autocomplete="off">
+            </div>
+
+            <div class="form-group hidden" id="societeGroup">
+                <label for="modalSociete" class="form-label">Société</label>
+                <input type="text" id="modalSociete" class="form-input" placeholder="Société" autocomplete="off">
+            </div>
+
+            <div class="form-group hidden" id="inviteDeGroup">
+                <label for="modalInviteDe" class="form-label">Invité de</label>
+                <input type="text" id="modalInviteDe" class="form-input" placeholder="Invité de" autocomplete="off">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeInputModal()">Annuler</button>
+                <button class="btn btn-primary" onclick="saveFromModal()">Valider</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast"></div>
+
+    <!-- APP SCRIPT -->
+    <script src="app.js"></script>
+</body>
+</html>
