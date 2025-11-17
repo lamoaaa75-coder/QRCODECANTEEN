@@ -236,21 +236,106 @@ function handleScanInput(e) {
 }
 
 function processScan(value) {
-    // Détection du type de badge
-    if (value === 'RENFORT') {
-        openScanModal('renforts');
-    } else if (value === 'INVITE') {
-        openScanModal('invites');
-    } else if (value === 'SECURITE') {
-        openScanModal('securite');
-    } else if (value === 'CANTINE') {
-        openScanModal('cantine');
-    } else if (value === 'FIGURANT') {
+    console.log('Scan détecté:', value);
+
+    // Détection du type de badge (commence par ou contient le mot-clé)
+
+    // FIGURANT
+    if (value === 'FIGURANT' || value.startsWith('FIGURANT')) {
         incrementFigurant();
         showToast('✅ Figurant ajouté');
+        return;
+    }
+
+    // RENFORT : "RENFORT NOM PRENOM DÉPARTEMENT"
+    if (value.startsWith('RENFORT')) {
+        handleRenfortScan(value);
+        return;
+    }
+
+    // INVITE : "INVITE NOM PRENOM"
+    if (value.startsWith('INVITE')) {
+        handleInviteScan(value);
+        return;
+    }
+
+    // SECURITE ou SÉCURITÉ : "SÉCURITÉ NOM PRÉNOM"
+    if (value.startsWith('SECURITE') || value.startsWith('SÉCURITÉ')) {
+        handleSecuriteScan(value);
+        return;
+    }
+
+    // CANTINE : "CANTINE" ou "CANTINE NOM"
+    if (value.startsWith('CANTINE')) {
+        handleCantineScan(value);
+        return;
+    }
+
+    // Sinon : Format équipe "Prénom NOM DÉPARTEMENT"
+    handleEquipeScan(value);
+}
+
+function handleRenfortScan(value) {
+    // Format: "RENFORT NOM PRENOM DÉPARTEMENT"
+    // Retirer "RENFORT" et parser le reste
+    const data = value.replace(/^RENFORT\s*/i, '').trim();
+    const parts = data.split(' ').filter(p => p.trim());
+
+    if (parts.length >= 2) {
+        const prenom = parts[0];
+        const nom = parts[1];
+        const dept = parts.slice(2).join(' ');
+
+        // Pré-remplir le modal
+        openScanModalWithData('renforts', { nom, prenom, departement: dept });
     } else {
-        // Format équipe : "Prénom NOM DÉPARTEMENT"
-        handleEquipeScan(value);
+        // Pas assez de données, ouvrir modal vide
+        openScanModal('renforts');
+    }
+}
+
+function handleInviteScan(value) {
+    // Format: "INVITE NOM PRENOM"
+    const data = value.replace(/^INVITE\s*/i, '').trim();
+    const parts = data.split(' ').filter(p => p.trim());
+
+    if (parts.length >= 2) {
+        const prenom = parts[0];
+        const nom = parts.slice(1).join(' ');
+
+        // Pré-remplir le modal
+        openScanModalWithData('invites', { nom, prenom });
+    } else {
+        openScanModal('invites');
+    }
+}
+
+function handleSecuriteScan(value) {
+    // Format: "SÉCURITÉ NOM PRÉNOM" ou "SECURITE NOM PRENOM"
+    const data = value.replace(/^(SECURITE|SÉCURITÉ)\s*/i, '').trim();
+    const parts = data.split(' ').filter(p => p.trim());
+
+    if (parts.length >= 2) {
+        const prenom = parts[0];
+        const nom = parts.slice(1).join(' ');
+
+        // Pré-remplir le modal
+        openScanModalWithData('securite', { nom, prenom });
+    } else {
+        openScanModal('securite');
+    }
+}
+
+function handleCantineScan(value) {
+    // Format: "CANTINE" ou "CANTINE NOM"
+    const data = value.replace(/^CANTINE\s*/i, '').trim();
+
+    if (data) {
+        // Il y a un nom
+        openScanModalWithData('cantine', { nom: data });
+    } else {
+        // Juste "CANTINE", modal vide
+        openScanModal('cantine');
     }
 }
 
@@ -297,10 +382,31 @@ function handleEquipeScan(value) {
 }
 
 function openScanModal(categorie) {
+    openScanModalWithData(categorie, {});
+}
+
+function openScanModalWithData(categorie, data = {}) {
     modalCategory = categorie;
     currentEditId = null;
     configureModalFields(categorie);
     clearModalInputs();
+
+    // Pré-remplir avec les données scannées
+    if (data.nom) {
+        document.getElementById('modalNom').value = data.nom.toUpperCase();
+    }
+    if (data.prenom) {
+        document.getElementById('modalPrenom').value = data.prenom;
+    }
+    if (data.departement) {
+        document.getElementById('modalDept').value = data.departement;
+    }
+    if (data.societe) {
+        document.getElementById('modalSociete').value = data.societe;
+    }
+    if (data.inviteDe) {
+        document.getElementById('modalInviteDe').value = data.inviteDe;
+    }
 
     const titles = {
         'renforts': 'Ajouter un renfort',
@@ -313,9 +419,20 @@ function openScanModal(categorie) {
     document.getElementById('modalTitle').textContent = titles[categorie] || 'Ajouter';
     document.getElementById('inputModal').classList.add('active');
 
-    // Focus sur premier champ
+    // Focus sur premier champ vide ou sur le bouton Valider si tout est rempli
     setTimeout(() => {
-        document.getElementById('modalNom').focus();
+        if (!data.nom) {
+            document.getElementById('modalNom').focus();
+        } else if (categorie === 'renforts' && !data.departement) {
+            document.getElementById('modalDept').focus();
+        } else if (categorie === 'securite' && !data.societe) {
+            document.getElementById('modalSociete').focus();
+        } else if (categorie === 'invites' && !data.inviteDe) {
+            document.getElementById('modalInviteDe').focus();
+        } else {
+            // Tout est rempli, focus sur bouton Valider
+            document.querySelector('.btn-primary').focus();
+        }
     }, 100);
 }
 
