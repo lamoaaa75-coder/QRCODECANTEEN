@@ -649,7 +649,7 @@ function renderAll() {
     updateTotalCounts();
 }
 
-function renderEquipeList() {
+function renderEquipeList(searchFilter = '') {
     const container = document.getElementById('equipeList');
 
     if (listeTechnique.length === 0) {
@@ -657,9 +657,24 @@ function renderEquipeList() {
         return;
     }
 
+    // Filtrer selon la recherche
+    const filter = searchFilter.toLowerCase();
+    const filteredList = filter
+        ? listeTechnique.filter(person => {
+            const fullName = `${person.prenom} ${person.nom}`.toLowerCase();
+            const dept = (person.departement || '').toLowerCase();
+            return fullName.includes(filter) || dept.includes(filter);
+        })
+        : listeTechnique;
+
+    if (filteredList.length === 0) {
+        container.innerHTML = '<div class="empty-state">Aucun résultat pour cette recherche</div>';
+        return;
+    }
+
     // Grouper par département
     const byDept = {};
-    listeTechnique.forEach(person => {
+    filteredList.forEach(person => {
         const dept = person.departement || 'NON DÉFINI';
         if (!byDept[dept]) byDept[dept] = [];
         byDept[dept].push(person);
@@ -686,6 +701,33 @@ function renderEquipeList() {
     });
 
     container.innerHTML = html;
+}
+
+function filterEquipeList() {
+    const searchInput = document.getElementById('equipeSearch');
+    const searchValue = searchInput.value.trim();
+    const clearBtn = document.getElementById('searchClearBtn');
+
+    // Afficher/masquer le bouton clear
+    if (searchValue) {
+        clearBtn.style.display = 'flex';
+    } else {
+        clearBtn.style.display = 'none';
+    }
+
+    // Filtrer la liste
+    renderEquipeList(searchValue);
+}
+
+function clearEquipeSearch() {
+    const searchInput = document.getElementById('equipeSearch');
+    searchInput.value = '';
+    filterEquipeList();
+
+    // Refocus sur l'input si en mode manuel
+    if (!scanModeActive) {
+        searchInput.focus();
+    }
 }
 
 function renderRenfortsList() {
@@ -750,9 +792,19 @@ function updateTotalCounts() {
     const figurantCount = getFigurantCountForDate(currentWorkingDate);
 
     const equipeCount = pointages.filter(p => p.categorie === CONFIG.CATEGORIES.EQUIPE).length;
-    const totalCount = pointages.length + figurantCount;
+
+    // Extras = Renforts + Invités + Sécurité + Cantine
+    const extrasCount = pointages.filter(p =>
+        p.categorie === CONFIG.CATEGORIES.RENFORTS ||
+        p.categorie === CONFIG.CATEGORIES.INVITES ||
+        p.categorie === CONFIG.CATEGORIES.SECURITE ||
+        p.categorie === CONFIG.CATEGORIES.CANTINE
+    ).length;
+
+    const totalCount = equipeCount + extrasCount + figurantCount;
 
     document.getElementById('statsEquipe').textContent = equipeCount;
+    document.getElementById('statsExtras').textContent = extrasCount;
     document.getElementById('statsFigurants').textContent = figurantCount;
     document.getElementById('statsTotal').textContent = totalCount;
 }

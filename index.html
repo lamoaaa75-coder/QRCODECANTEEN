@@ -155,8 +155,14 @@
 
         .stats {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: var(--spacing-md);
+        }
+
+        @media (max-width: 640px) {
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         .stat-item {
@@ -813,6 +819,54 @@
             color: white;
         }
 
+        /* ========== SEARCH BOX ========== */
+        .search-box {
+            position: relative;
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .search-input {
+            width: 100%;
+            padding: var(--spacing-md);
+            padding-right: 40px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 16px;
+            font-family: inherit;
+        }
+
+        .search-input:focus {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            border-color: var(--accent);
+        }
+
+        .search-clear {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--text-secondary);
+            color: var(--bg-card);
+            border: none;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .search-clear:hover {
+            background: var(--error);
+            transform: translateY(-50%) scale(1.1);
+        }
+
         /* ========== RESPONSIVE ========== */
         @media (min-width: 768px) {
             .container {
@@ -856,6 +910,10 @@
             <div class="stat-item">
                 <div class="stat-label">Équipe</div>
                 <div class="stat-value" id="statsEquipe" aria-live="polite">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">Extras</div>
+                <div class="stat-value" id="statsExtras" aria-live="polite">0</div>
             </div>
             <div class="stat-item">
                 <div class="stat-label">Figurants</div>
@@ -940,6 +998,16 @@
             📋 Charger la liste technique (CSV)
         </label>
         <input type="file" id="csvFileInput" class="file-input" accept=".csv">
+
+        <div class="search-box">
+            <input type="text"
+                   id="equipeSearch"
+                   class="search-input"
+                   placeholder="🔍 Rechercher un nom..."
+                   autocomplete="off"
+                   oninput="filterEquipeList()">
+            <button class="search-clear" id="searchClearBtn" onclick="clearEquipeSearch()" style="display: none;">×</button>
+        </div>
 
         <div id="equipeList"></div>
     </div>
