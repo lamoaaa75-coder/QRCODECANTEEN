@@ -1065,6 +1065,308 @@
             transform: translateY(-50%) scale(1.1);
         }
 
+        /* ========== CONNECTION BADGE ========== */
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+        }
+
+        .connection-badge {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-xs);
+            padding: 4px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+            animation: pulse-dot 2s infinite;
+        }
+
+        .connection-badge.offline .connection-dot {
+            background: #ff9800;
+            animation: pulse-dot-warning 2s infinite;
+        }
+
+        .connection-badge.disconnected .connection-dot {
+            background: #f44336;
+            animation: none;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        @keyframes pulse-dot-warning {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.2); }
+        }
+
+        /* ========== CAMERA SCANNER ========== */
+        .camera-scanner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            z-index: 2000;
+        }
+
+        .camera-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        #cameraScanVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .camera-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .camera-frame {
+            width: 250px;
+            height: 250px;
+            border: 3px solid var(--accent);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .camera-frame::before,
+        .camera-frame::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #fff;
+        }
+
+        .camera-frame::before {
+            top: -3px;
+            left: -3px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .camera-frame::after {
+            bottom: -3px;
+            right: -3px;
+            border-left: none;
+            border-top: none;
+        }
+
+        .camera-hint {
+            margin-top: var(--spacing-xl);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+        }
+
+        .camera-controls {
+            position: absolute;
+            bottom: var(--spacing-xl);
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: var(--spacing-md);
+            pointer-events: auto;
+        }
+
+        .camera-btn {
+            padding: var(--spacing-md) var(--spacing-xl);
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: var(--radius-lg);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 50px;
+        }
+
+        .camera-btn:active {
+            transform: scale(0.95);
+        }
+
+        .camera-close {
+            background: rgba(244, 67, 54, 0.9);
+            color: white;
+        }
+
+        .camera-counter {
+            position: absolute;
+            top: var(--spacing-xl);
+            right: var(--spacing-xl);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--radius-md);
+            font-size: 14px;
+            font-weight: 600;
+            pointer-events: auto;
+        }
+
+        /* ========== MOBILE ACTIONS (BOUTONS FIXES) ========== */
+        .mobile-actions {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            background: var(--bg-card);
+            border-top: 2px solid var(--border);
+            padding: var(--spacing-sm);
+            gap: var(--spacing-xs);
+            z-index: 100;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .mobile-action-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: var(--spacing-sm);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 60px;
+            gap: 4px;
+        }
+
+        .mobile-action-btn:active {
+            transform: scale(0.95);
+            background: var(--accent-soft);
+        }
+
+        .mobile-action-icon {
+            font-size: 24px;
+        }
+
+        .mobile-action-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        /* ========== EXPORT PANEL (LATÉRAL) ========== */
+        .export-panel {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            max-width: 90vw;
+            height: 100vh;
+            background: var(--bg-card);
+            box-shadow: -4px 0 12px rgba(0, 0, 0, 0.3);
+            z-index: 1500;
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .export-panel.active {
+            right: 0;
+        }
+
+        .export-panel-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1400;
+            display: none;
+        }
+
+        .export-panel-overlay.active {
+            display: block;
+        }
+
+        .export-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-lg);
+            border-bottom: 2px solid var(--border);
+        }
+
+        .export-panel-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .export-panel-close {
+            background: transparent;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            width: 32px;
+            height: 32px;
+        }
+
+        .export-panel-close:hover {
+            color: var(--text-primary);
+        }
+
+        .export-panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: var(--spacing-lg);
+        }
+
+        /* Mode plein écran */
+        body.fullscreen-mode .header,
+        body.fullscreen-mode .tabs,
+        body.fullscreen-mode .stats {
+            display: none;
+        }
+
+        body.fullscreen-mode .container {
+            padding-top: 0;
+        }
+
+        body.fullscreen-mode .scanner-section {
+            padding: var(--spacing-xl);
+        }
+
+        body.fullscreen-mode .scanner-input {
+            font-size: 24px;
+            padding: var(--spacing-xl);
+        }
+
         /* ========== RESPONSIVE ========== */
         @media (min-width: 768px) {
             .container {
@@ -1094,9 +1396,15 @@
                 <span>🎬</span>
                 <span>KRAKEN</span>
             </h1>
-            <button class="theme-toggle" onclick="toggleTheme()" aria-label="Changer le thème">
-                🌙
-            </button>
+            <div class="header-actions">
+                <div class="connection-badge" id="connectionBadge">
+                    <span class="connection-dot"></span>
+                    <span class="connection-text">Connecté</span>
+                </div>
+                <button class="theme-toggle" onclick="toggleTheme()" aria-label="Changer le thème">
+                    🌙
+                </button>
+            </div>
         </div>
 
         <div class="date-section">
@@ -1141,6 +1449,29 @@
             📷 Mode Scan
         </button>
     </section>
+
+    <!-- PANNEAU VIDÉO SCAN CAMÉRA -->
+    <div class="camera-scanner" id="cameraScanner" style="display: none;">
+        <div class="camera-container">
+            <video id="cameraScanVideo" autoplay playsinline></video>
+            <canvas id="cameraScanCanvas" style="display: none;"></canvas>
+            <div class="camera-overlay">
+                <div class="camera-frame"></div>
+                <div class="camera-hint">Placez le QR code dans le cadre</div>
+            </div>
+            <div class="camera-controls">
+                <button class="camera-btn" id="toggleFlash" onclick="toggleFlash()" style="display: none;">
+                    💡 Flash
+                </button>
+                <button class="camera-btn camera-close" onclick="stopCameraScanning()">
+                    ✕ Fermer
+                </button>
+            </div>
+            <div class="camera-counter" id="cameraCounter" style="display: none;">
+                Scans : <span id="cameraCounterValue">0</span>
+            </div>
+        </div>
+    </div>
 
     <!-- TABS -->
     <div class="tabs" role="tablist">
@@ -1275,8 +1606,8 @@
                     <input type="date" id="exportToDate" class="form-input">
                 </div>
             </div>
-            <button class="btn btn-export" onclick="showExportPreview()">
-                Prévisualiser et Exporter
+            <button class="btn btn-export" onclick="openExportPanel()">
+                📊 Ouvrir panneau export
             </button>
         </div>
 
@@ -1398,8 +1729,43 @@
         </div>
     </div>
 
+    <!-- BOUTONS TACTILES FIXES (iPhone) -->
+    <div class="mobile-actions" id="mobileActions">
+        <button class="mobile-action-btn" onclick="cycleTabs()" aria-label="Changer de catégorie">
+            <span class="mobile-action-icon">🔄</span>
+            <span class="mobile-action-label" id="currentTabLabel">Équipe</span>
+        </button>
+        <button class="mobile-action-btn" onclick="refocusScannerInput()" aria-label="Refocus scanner">
+            <span class="mobile-action-icon">🎯</span>
+            <span class="mobile-action-label">Focus</span>
+        </button>
+        <button class="mobile-action-btn" onclick="toggleCameraMode()" aria-label="Scanner caméra" id="cameraModeBtn">
+            <span class="mobile-action-icon">📸</span>
+            <span class="mobile-action-label">Caméra</span>
+        </button>
+        <button class="mobile-action-btn" onclick="toggleFullscreenMode()" aria-label="Mode plein écran" id="fullscreenBtn">
+            <span class="mobile-action-icon">⛶</span>
+            <span class="mobile-action-label">Écran</span>
+        </button>
+    </div>
+
+    <!-- PANNEAU LATÉRAL EXPORT -->
+    <div class="export-panel" id="exportPanel">
+        <div class="export-panel-header">
+            <h3 class="export-panel-title">📊 Export</h3>
+            <button class="export-panel-close" onclick="closeExportPanel()">×</button>
+        </div>
+        <div class="export-panel-content" id="exportPanelContent">
+            <!-- Contenu dynamique -->
+        </div>
+    </div>
+    <div class="export-panel-overlay" id="exportPanelOverlay" onclick="closeExportPanel()"></div>
+
     <!-- TOAST -->
     <div class="toast" id="toast"></div>
+
+    <!-- JSQR LIBRARY (scan caméra) -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
     <!-- APP SCRIPT -->
     <script src="app.js"></script>

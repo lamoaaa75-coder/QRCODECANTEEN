@@ -29,6 +29,21 @@ let scanModeActive = true; // Mode scan activé par défaut
 let quickAddMode = false; // Mode rajout rapide
 let actionHistory = []; // Historique des actions (max 10)
 
+// Scan caméra
+let cameraStream = null;
+let cameraAnimationFrame = null;
+let cameraScanActive = false;
+let cameraScansCount = 0;
+let flashEnabled = false;
+let continuousScanMode = false;
+
+// Connexion
+let connectionCheckInterval = null;
+let lastConnectionCheck = Date.now();
+
+// Mode plein écran
+let fullscreenMode = false;
+
 // ========== UTILITAIRES ==========
 function generateId() {
     return 'id-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -666,6 +681,7 @@ function addPointage(pointage) {
 
     pointage.id = generateId();
     pointage.date = currentWorkingDate;
+    pointage.timestamp = new Date().toISOString(); // Horodatage
     pointages.push(pointage);
     savePointagesForDate(currentWorkingDate, pointages);
 
@@ -1363,6 +1379,7 @@ function generateExportData(fromDate, toDate) {
                 societe: p.societe || '',
                 inviteDe: p.inviteDe || '',
                 origine: p.origine,
+                timestamp: p.timestamp || '',
                 quantite: 1
             });
         });
@@ -1378,6 +1395,7 @@ function generateExportData(fromDate, toDate) {
                 societe: '',
                 inviteDe: '',
                 origine: 'compteur',
+                timestamp: '',
                 quantite: figurantCount
             });
         }
@@ -1707,6 +1725,459 @@ function setupEventListeners() {
     }, CONFIG.REFOCUS_INTERVAL);
 }
 
+// ========== SCAN CAMÉRA ==========
+async function toggleCameraMode() {
+    if (cameraScanActive) {
+        stopCameraScanning();
+    } else {
+        await startCameraScanning();
+    }
+}
+
+async function startCameraScanning() {
+    try {
+        // Vérifier si jsQR est disponible
+        if (typeof jsQR === 'undefined') {
+            showToast('⚠️ Bibliothèque de scan QR non chargée', true);
+            return;
+        }
+
+        // Demander accès caméra
+        const constraints = {
+            video: {
+                facingMode: 'environment', // Caméra arrière sur mobile
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        };
+
+        cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        const video = document.getElementById('cameraScanVideo');
+        video.srcObject = cameraStream;
+
+        // Afficher le panneau caméra
+        document.getElementById('cameraScanner').style.display = 'block';
+        cameraScanActive = true;
+        cameraScansCount = 0;
+
+        // Vérifier support flash/lampe
+        const track = cameraStream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities();
+
+        if (capabilities.torch) {
+            document.getElementById('toggleFlash').style.display = 'block';
+        }
+
+        // Démarrer le scan en boucle
+        video.onloadedmetadata = () => {
+            scanQRFromCamera();
+        };
+
+        showToast('📸 Scan caméra activé');
+        vibrate(50);
+
+    } catch (error) {
+        console.error('Erreur accès caméra:', error);
+
+        if (error.name === 'NotAllowedError') {
+            showToast('⚠️ Accès caméra refusé. Utilisez le lecteur 2D.', true);
+        } else if (error.name === 'NotFoundError') {
+            showToast('⚠️ Aucune caméra trouvée', true);
+        } else {
+            showToast('⚠️ Erreur caméra. Mode lecteur 2D activé.', true);
+        }
+
+        cameraScanActive = false;
+    }
+}
+
+function scanQRFromCamera() {
+    if (!cameraScanActive) return;
+
+    const video = document.getElementById('cameraScanVideo');
+    const canvas = document.getElementById('cameraScanCanvas');
+    const ctx = canvas.getContext('2d');
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'dontInvert'
+        });
+
+        if (code) {
+            // QR code détecté !
+            vibrate([50, 100, 50]); // Pattern vibration
+
+            // Jouer un son (optionnel)
+            playBeep();
+
+            // Traiter le scan
+            const value = code.data.trim().toUpperCase();
+            handleScanInput({ key: 'Enter', target: { value } });
+
+            cameraScansCount++;
+            document.getElementById('cameraCounterValue').textContent = cameraScansCount;
+
+            if (!continuousScanMode) {
+                // Arrêter après un scan si mode normal
+                stopCameraScanning();
+                return;
+            } else {
+                // En mode continu, montrer le compteur
+                document.getElementById('cameraCounter').style.display = 'block';
+                // Petite pause pour éviter le double scan
+                setTimeout(() => {
+                    cameraAnimationFrame = requestAnimationFrame(scanQRFromCamera);
+                }, 500);
+                return;
+            }
+        }
+    }
+
+    cameraAnimationFrame = requestAnimationFrame(scanQRFromCamera);
+}
+
+function stopCameraScanning() {
+    cameraScanActive = false;
+
+    if (cameraAnimationFrame) {
+        cancelAnimationFrame(cameraAnimationFrame);
+        cameraAnimationFrame = null;
+    }
+
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+
+    document.getElementById('cameraScanner').style.display = 'none';
+    flashEnabled = false;
+
+    showToast('📸 Scan caméra arrêté');
+}
+
+async function toggleFlash() {
+    if (!cameraStream) return;
+
+    try {
+        const track = cameraStream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities();
+
+        if (capabilities.torch) {
+            flashEnabled = !flashEnabled;
+            await track.applyConstraints({
+                advanced: [{ torch: flashEnabled }]
+            });
+
+            const btn = document.getElementById('toggleFlash');
+            btn.textContent = flashEnabled ? '🔦 Flash ON' : '💡 Flash';
+            vibrate(30);
+        }
+    } catch (error) {
+        console.error('Erreur flash:', error);
+        showToast('⚠️ Flash non disponible', true);
+    }
+}
+
+function playBeep() {
+    // Son de confirmation (optionnel, utilise Web Audio API)
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.1);
+    } catch (error) {
+        // Silencieux si erreur
+    }
+}
+
+function vibrate(pattern) {
+    if ('vibrate' in navigator) {
+        navigator.vibrate(pattern);
+    }
+}
+
+// ========== PANNEAU EXPORT LATÉRAL ==========
+function openExportPanel() {
+    const fromDate = document.getElementById('exportFromDate').value;
+    const toDate = document.getElementById('exportToDate').value;
+
+    if (!fromDate || !toDate) {
+        showToast('⚠️ Sélectionnez les dates', true);
+        return;
+    }
+
+    if (fromDate > toDate) {
+        showToast('⚠️ Date de début après date de fin', true);
+        return;
+    }
+
+    // Générer les données
+    currentExportData = generateExportData(fromDate, toDate);
+    const stats = calculateExportStats(currentExportData);
+    const duplicates = detectExportDuplicates(currentExportData);
+
+    // Construire le contenu du panneau
+    let html = `
+        <!-- Stats rapides -->
+        <div class="export-stats" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 16px;">
+            <div class="export-stat-item" style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">TOTAL</div>
+                <div style="font-size: 24px; font-weight: 700; color: var(--accent);">${stats.total}</div>
+            </div>
+            <div class="export-stat-item" style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">UNIQUES</div>
+                <div style="font-size: 24px; font-weight: 700; color: var(--accent);">${stats.unique}</div>
+            </div>
+        </div>
+
+        <!-- Période -->
+        <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; margin-bottom: 16px; text-align: center;">
+            <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">PÉRIODE</div>
+            <div style="font-weight: 600;">${fromDate} → ${toDate}</div>
+        </div>
+
+        <!-- Breakdown -->
+        <div style="background: var(--bg-secondary); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+            <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary);">PAR CATÉGORIE</div>
+            ${Object.entries(stats.byCategory).map(([cat, count]) => `
+                <div style="display: flex; justify-content: space-between; padding: 4px 0; font-size: 14px;">
+                    <span>${cat}</span>
+                    <span style="color: var(--accent); font-weight: 700;">${count}</span>
+                </div>
+            `).join('')}
+        </div>
+
+        ${duplicates.length > 0 ? `
+            <div style="background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                <div style="font-weight: 700; color: #ff9800; margin-bottom: 8px;">⚠️ ${duplicates.length} Doublons détectés</div>
+                <div style="font-size: 13px; max-height: 120px; overflow-y: auto;">
+                    ${duplicates.slice(0, 10).map(d => `
+                        <div style="padding: 4px 0; border-bottom: 1px solid rgba(255, 193, 7, 0.2);">
+                            ${d.nom} ${d.prenom} (${d.categorie})<br>
+                            <span style="font-size: 11px; color: var(--text-secondary);">${d.dates.join(', ')}</span>
+                        </div>
+                    `).join('')}
+                    ${duplicates.length > 10 ? `<div style="padding: 8px 0; font-size: 12px; color: var(--text-secondary);">... et ${duplicates.length - 10} autres</div>` : ''}
+                </div>
+            </div>
+        ` : ''}
+
+        <!-- Aperçu tableau (10 lignes) -->
+        <div style="margin-bottom: 16px;">
+            <div style="font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--text-secondary);">APERÇU (10 lignes)</div>
+            <div style="background: var(--bg-secondary); border-radius: 8px; overflow: hidden; font-size: 12px;">
+                ${currentExportData.slice(0, 10).map((row, i) => `
+                    <div style="padding: 8px; ${i % 2 === 0 ? 'background: rgba(0, 136, 255, 0.05);' : ''}">
+                        <div style="font-weight: 600;">${row.nom} ${row.prenom}</div>
+                        <div style="font-size: 11px; color: var(--text-secondary);">${row.date} · ${row.categorie} ${row.departement ? '· ' + row.departement : ''}</div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+
+        <!-- Format export -->
+        <div style="margin-bottom: 16px;">
+            <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 8px;">FORMAT</label>
+            <select id="exportFormat" class="form-input" style="width: 100%;">
+                <option value="csv">CSV (Excel)</option>
+                <option value="json">JSON</option>
+            </select>
+        </div>
+
+        <!-- Encodage (seulement pour CSV) -->
+        <div id="encodingSection" style="margin-bottom: 16px;">
+            <label style="font-size: 12px; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 8px;">ENCODAGE</label>
+            <select id="exportEncodingPanel" class="form-input" style="width: 100%;">
+                <option value="utf-8">UTF-8</option>
+                <option value="windows-1252">Windows-1252</option>
+            </select>
+        </div>
+
+        <!-- Boutons -->
+        <div style="display: grid; gap: 12px;">
+            <button class="btn btn-primary" onclick="confirmExportFromPanel()" style="width: 100%;">
+                📥 Télécharger
+            </button>
+            <button class="btn btn-cancel" onclick="closeExportPanel()" style="width: 100%;">
+                Annuler
+            </button>
+        </div>
+    `;
+
+    document.getElementById('exportPanelContent').innerHTML = html;
+    document.getElementById('exportPanel').classList.add('active');
+    document.getElementById('exportPanelOverlay').classList.add('active');
+
+    // Listener pour cacher section encodage si JSON
+    setTimeout(() => {
+        const formatSelect = document.getElementById('exportFormat');
+        formatSelect.addEventListener('change', () => {
+            const encodingSection = document.getElementById('encodingSection');
+            encodingSection.style.display = formatSelect.value === 'csv' ? 'block' : 'none';
+        });
+    }, 100);
+
+    vibrate(30);
+}
+
+function closeExportPanel() {
+    document.getElementById('exportPanel').classList.remove('active');
+    document.getElementById('exportPanelOverlay').classList.remove('active');
+    currentExportData = null;
+}
+
+function confirmExportFromPanel() {
+    if (!currentExportData || currentExportData.length === 0) {
+        showToast('⚠️ Aucune donnée à exporter', true);
+        return;
+    }
+
+    const format = document.getElementById('exportFormat').value;
+    const fromDate = document.getElementById('exportFromDate').value;
+    const toDate = document.getElementById('exportToDate').value;
+
+    if (format === 'json') {
+        // Export JSON
+        const jsonData = {
+            meta: {
+                export_date: new Date().toISOString(),
+                period_start: fromDate,
+                period_end: toDate,
+                total_entries: currentExportData.length
+            },
+            data: currentExportData
+        };
+
+        const jsonString = JSON.stringify(jsonData, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        link.setAttribute('href', url);
+        link.setAttribute('download', `KRAKEN_Pointage_${fromDate}_${toDate}.json`);
+        link.style.visibility = 'hidden';
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showToast('✅ JSON téléchargé');
+    } else {
+        // Export CSV
+        const encoding = document.getElementById('exportEncodingPanel').value;
+
+        let csv = 'date;categorie;nom;prenom;departement;poste;societe;invite_de;origine;horodatage;quantite\n';
+        currentExportData.forEach(row => {
+            const timestamp = row.timestamp || '';
+            csv += `${row.date};${row.categorie};${row.nom};${row.prenom};${row.departement};${row.poste};${row.societe};${row.inviteDe};${row.origine};${timestamp};${row.quantite}\n`;
+        });
+
+        downloadCSVWithEncoding(csv, `KRAKEN_Pointage_${fromDate}_${toDate}.csv`, encoding);
+    }
+
+    closeExportPanel();
+    vibrate(50);
+}
+
+// ========== BADGE STATUT CONNEXION ==========
+function initConnectionMonitor() {
+    updateConnectionBadge();
+
+    // Vérifier toutes les 5 secondes
+    connectionCheckInterval = setInterval(() => {
+        updateConnectionBadge();
+    }, 5000);
+
+    // Écouter les événements online/offline
+    window.addEventListener('online', updateConnectionBadge);
+    window.addEventListener('offline', updateConnectionBadge);
+}
+
+function updateConnectionBadge() {
+    const badge = document.getElementById('connectionBadge');
+    const text = badge.querySelector('.connection-text');
+
+    if (navigator.onLine) {
+        // En ligne, mais vérifier si connexion stable
+        const now = Date.now();
+        const timeSinceLastCheck = now - lastConnectionCheck;
+
+        if (timeSinceLastCheck > 10000) {
+            badge.classList.remove('disconnected');
+            badge.classList.add('offline');
+            text.textContent = 'Instable';
+        } else {
+            badge.classList.remove('offline', 'disconnected');
+            text.textContent = 'Connecté';
+        }
+
+        lastConnectionCheck = now;
+    } else {
+        badge.classList.remove('offline');
+        badge.classList.add('disconnected');
+        text.textContent = 'Hors ligne';
+    }
+}
+
+// ========== BOUTONS TACTILES MOBILES ==========
+function cycleTabs() {
+    const tabs = ['equipe', 'renforts', 'invites', 'securite', 'cantine', 'figurants'];
+    const currentIndex = tabs.indexOf(currentCategory);
+    const nextIndex = (currentIndex + 1) % tabs.length;
+    const nextTab = tabs[nextIndex];
+
+    switchTab(nextTab);
+
+    // Mettre à jour le label
+    const label = document.getElementById('currentTabLabel');
+    const tabNames = {
+        'equipe': 'Équipe',
+        'renforts': 'Renforts',
+        'invites': 'Invités',
+        'securite': 'Sécurité',
+        'cantine': 'Cantine',
+        'figurants': 'Figurants'
+    };
+    label.textContent = tabNames[nextTab];
+
+    vibrate(30);
+}
+
+function toggleFullscreenMode() {
+    fullscreenMode = !fullscreenMode;
+
+    if (fullscreenMode) {
+        document.body.classList.add('fullscreen-mode');
+        showToast('⛶ Mode plein écran activé');
+    } else {
+        document.body.classList.remove('fullscreen-mode');
+        showToast('⛶ Mode normal');
+    }
+
+    vibrate(50);
+}
+
+// ========== AMÉLIORATION EXPORT AVEC HORODATAGE ==========
+// Mettre à jour addPointage pour ajouter un timestamp
+const originalAddPointage = addPointage;
+
 // ========== INITIALISATION ==========
 function init() {
     console.log('🎬 KRAKEN - Pointage Cantine - Initialisation...');
@@ -1733,6 +2204,9 @@ function init() {
 
     // Initialiser le bouton undo (désactivé au départ)
     updateHistoryDisplay();
+
+    // Initialiser le badge de connexion
+    initConnectionMonitor();
 
     // Focus initial
     refocusScannerInput();
