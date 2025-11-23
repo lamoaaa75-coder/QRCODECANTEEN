@@ -1232,6 +1232,62 @@
             pointer-events: auto;
         }
 
+        .camera-badge-continuous {
+            position: absolute;
+            top: calc(var(--spacing-xl) + 40px);
+            right: var(--spacing-xl);
+            background: rgba(0, 136, 255, 0.9);
+            color: white;
+            padding: var(--spacing-xs) var(--spacing-sm);
+            border-radius: var(--radius-md);
+            font-size: 12px;
+            font-weight: 700;
+            pointer-events: none;
+            animation: pulse 2s infinite;
+        }
+
+        .camera-recent-scans {
+            position: absolute;
+            bottom: calc(var(--spacing-xl) + 70px);
+            left: var(--spacing-md);
+            right: var(--spacing-md);
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-sm);
+            pointer-events: auto;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        .camera-recent-title {
+            font-size: 11px;
+            color: #999;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .camera-recent-list {
+            font-size: 13px;
+            color: white;
+        }
+
+        .camera-recent-item {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .camera-recent-item:last-child {
+            border-bottom: none;
+        }
+
+        .camera-recent-time {
+            font-size: 10px;
+            color: #999;
+        }
+
         /* ========== MOBILE ACTIONS (BOUTONS FIXES) ========== */
         .mobile-actions {
             position: fixed;
@@ -1246,6 +1302,48 @@
             gap: var(--spacing-xs);
             z-index: 100;
             box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+            transition: transform 0.3s ease, opacity 0.3s ease, background 0.3s ease;
+        }
+
+        .mobile-actions:hover {
+            background: rgba(var(--bg-card-rgb), 0.95);
+        }
+
+        .mobile-actions.hidden {
+            transform: translateY(100%);
+        }
+
+        .mobile-actions.compact {
+            padding: var(--spacing-xs);
+        }
+
+        .mobile-actions.compact .mobile-action-btn {
+            min-height: 48px;
+            padding: var(--spacing-xs);
+        }
+
+        .mobile-actions.compact .mobile-action-icon {
+            font-size: 20px;
+        }
+
+        .mobile-actions.compact .mobile-action-label {
+            font-size: 10px;
+        }
+
+        .mobile-actions-advanced {
+            position: fixed;
+            bottom: 80px;
+            left: 0;
+            right: 0;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+            padding: var(--spacing-xs);
+            gap: var(--spacing-xs);
+            z-index: 99;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
         }
 
         .mobile-action-btn {
@@ -1397,7 +1495,7 @@
                 <span>KRAKEN</span>
             </h1>
             <div class="header-actions">
-                <div class="connection-badge" id="connectionBadge">
+                <div class="connection-badge" id="connectionBadge" title="">
                     <span class="connection-dot"></span>
                     <span class="connection-text">Connecté</span>
                 </div>
@@ -1410,6 +1508,11 @@
         <div class="date-section">
             <label for="workingDate" class="date-label">Date de travail</label>
             <input type="date" id="workingDate" class="date-input" aria-label="Date de travail">
+        </div>
+
+        <!-- Rappel préférences -->
+        <div class="preferences-reminder" id="preferencesReminder" style="font-size: 11px; color: var(--text-secondary); text-align: center; margin-top: 8px;">
+            <!-- Contenu dynamique -->
         </div>
 
         <div class="stats">
@@ -1463,12 +1566,22 @@
                 <button class="camera-btn" id="toggleFlash" onclick="toggleFlash()" style="display: none;">
                     💡 Flash
                 </button>
+                <button class="camera-btn" id="toggleContinuous" onclick="toggleContinuousMode()">
+                    <span id="continuousBtnText">🔁 Rafale OFF</span>
+                </button>
                 <button class="camera-btn camera-close" onclick="stopCameraScanning()">
                     ✕ Fermer
                 </button>
             </div>
-            <div class="camera-counter" id="cameraCounter" style="display: none;">
+            <div class="camera-counter" id="cameraCounter">
                 Scans : <span id="cameraCounterValue">0</span>
+            </div>
+            <div class="camera-badge-continuous" id="cameraBadgeContinuous" style="display: none;">
+                🔁 MODE RAFALE
+            </div>
+            <div class="camera-recent-scans" id="cameraRecentScans">
+                <div class="camera-recent-title">Derniers scans :</div>
+                <div id="cameraRecentList">Aucun scan</div>
             </div>
         </div>
     </div>
@@ -1611,6 +1724,24 @@
             </button>
         </div>
 
+        <!-- SAUVEGARDE/RESTAURATION -->
+        <div class="backup-section" style="margin-top: 24px;">
+            <h3 class="export-title">💾 Sauvegarde & Partage</h3>
+            <div class="actions-grid">
+                <button class="btn-action" onclick="saveFullBackup()">
+                    💾 Sauvegarder Tout
+                </button>
+                <button class="btn-action" onclick="document.getElementById('restoreFileInput').click()">
+                    📂 Restaurer
+                </button>
+                <button class="btn-action" onclick="shareLastExport()" id="shareBtn" style="display: none;">
+                    📤 Partager
+                </button>
+            </div>
+            <input type="file" id="restoreFileInput" accept=".json" style="display: none;" onchange="restoreFromBackup(event)">
+            <div id="lastBackupInfo" style="margin-top: 12px; font-size: 13px; color: var(--text-secondary); text-align: center;"></div>
+        </div>
+
         <div class="actions-section">
             <h3 class="actions-title">⚙️ Actions</h3>
             <div class="actions-grid">
@@ -1743,9 +1874,29 @@
             <span class="mobile-action-icon">📸</span>
             <span class="mobile-action-label">Caméra</span>
         </button>
-        <button class="mobile-action-btn" onclick="toggleFullscreenMode()" aria-label="Mode plein écran" id="fullscreenBtn">
+        <button class="mobile-action-btn" onclick="toggleMobileAdvanced()" aria-label="Actions avancées" id="advancedBtn">
+            <span class="mobile-action-icon">⋯</span>
+            <span class="mobile-action-label">Plus</span>
+        </button>
+    </div>
+
+    <!-- LIGNE SECONDAIRE REPLIABLE -->
+    <div class="mobile-actions-advanced" id="mobileActionsAdvanced" style="display: none;">
+        <button class="mobile-action-btn" onclick="toggleFullscreenMode()">
             <span class="mobile-action-icon">⛶</span>
-            <span class="mobile-action-label">Écran</span>
+            <span class="mobile-action-label">Plein Écran</span>
+        </button>
+        <button class="mobile-action-btn" onclick="toggleCompactMode()">
+            <span class="mobile-action-icon">📏</span>
+            <span class="mobile-action-label">Compact</span>
+        </button>
+        <button class="mobile-action-btn" onclick="saveFullBackup()">
+            <span class="mobile-action-icon">💾</span>
+            <span class="mobile-action-label">Sauvegarder</span>
+        </button>
+        <button class="mobile-action-btn" onclick="shareLastExport()">
+            <span class="mobile-action-icon">📤</span>
+            <span class="mobile-action-label">Partager</span>
         </button>
     </div>
 
@@ -1760,6 +1911,23 @@
         </div>
     </div>
     <div class="export-panel-overlay" id="exportPanelOverlay" onclick="closeExportPanel()"></div>
+
+    <!-- MODAL PREVIEW RESTAURATION -->
+    <div class="modal" id="restorePreviewModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">📂 Aperçu Restauration</h2>
+                <button class="modal-close" onclick="closeRestorePreview()" aria-label="Fermer">×</button>
+            </div>
+            <div id="restorePreviewContent" style="max-height: 400px; overflow-y: auto;">
+                <!-- Contenu dynamique -->
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeRestorePreview()">Annuler</button>
+                <button class="btn btn-primary" onclick="confirmRestore()">✅ Restaurer</button>
+            </div>
+        </div>
+    </div>
 
     <!-- TOAST -->
     <div class="toast" id="toast"></div>

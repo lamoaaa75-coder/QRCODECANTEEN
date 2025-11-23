@@ -36,13 +36,24 @@ let cameraScanActive = false;
 let cameraScansCount = 0;
 let flashEnabled = false;
 let continuousScanMode = false;
+let recentScans = []; // 3 derniers scans
 
 // Connexion
 let connectionCheckInterval = null;
 let lastConnectionCheck = Date.now();
+let lastConnectionSuccess = Date.now();
+
+// Tracking erreurs
+let errorLog = [];
 
 // Mode plein écran
 let fullscreenMode = false;
+
+// Barre mobile
+let mobileBarCompact = false;
+let mobileBarAutoHide = true;
+let mobileBarHidden = false;
+let lastScrollY = 0;
 
 // ========== UTILITAIRES ==========
 function generateId() {
@@ -1823,13 +1834,14 @@ function scanQRFromCamera() {
             cameraScansCount++;
             document.getElementById('cameraCounterValue').textContent = cameraScansCount;
 
+            // Ajouter aux scans récents
+            addToRecentScans(value);
+
             if (!continuousScanMode) {
                 // Arrêter après un scan si mode normal
                 stopCameraScanning();
                 return;
             } else {
-                // En mode continu, montrer le compteur
-                document.getElementById('cameraCounter').style.display = 'block';
                 // Petite pause pour éviter le double scan
                 setTimeout(() => {
                     cameraAnimationFrame = requestAnimationFrame(scanQRFromCamera);
@@ -1857,6 +1869,17 @@ function stopCameraScanning() {
 
     document.getElementById('cameraScanner').style.display = 'none';
     flashEnabled = false;
+
+    // Réinitialiser scans récents
+    recentScans = [];
+    updateRecentScansDisplay();
+
+    // Réinitialiser mode rafale
+    if (continuousScanMode) {
+        continuousScanMode = false;
+        document.getElementById('continuousBtnText').textContent = '🔁 Rafale OFF';
+        document.getElementById('cameraBadgeContinuous').style.display = 'none';
+    }
 
     showToast('📸 Scan caméra arrêté');
 }
@@ -1911,6 +1934,59 @@ function vibrate(pattern) {
     if ('vibrate' in navigator) {
         navigator.vibrate(pattern);
     }
+}
+
+function toggleContinuousMode() {
+    continuousScanMode = !continuousScanMode;
+
+    const btn = document.getElementById('continuousBtnText');
+    const badge = document.getElementById('cameraBadgeContinuous');
+
+    if (continuousScanMode) {
+        btn.textContent = '🔁 Rafale ON';
+        badge.style.display = 'block';
+        showToast('🔁 Mode rafale activé');
+    } else {
+        btn.textContent = '🔁 Rafale OFF';
+        badge.style.display = 'none';
+        showToast('Mode normal activé');
+    }
+
+    vibrate(30);
+}
+
+function addToRecentScans(value) {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    // Ajouter au début du tableau
+    recentScans.unshift({
+        value: value,
+        time: timeStr,
+        timestamp: now.getTime()
+    });
+
+    // Garder seulement les 3 derniers
+    recentScans = recentScans.slice(0, 3);
+
+    // Mettre à jour l'affichage
+    updateRecentScansDisplay();
+}
+
+function updateRecentScansDisplay() {
+    const listEl = document.getElementById('cameraRecentList');
+
+    if (recentScans.length === 0) {
+        listEl.textContent = 'Aucun scan';
+        return;
+    }
+
+    listEl.innerHTML = recentScans.map(scan => `
+        <div class="camera-recent-item">
+            <span style="flex: 1; overflow: hidden; text-overflow: ellipsis;">${scan.value}</span>
+            <span class="camera-recent-time">${scan.time}</span>
+        </div>
+    `).join('');
 }
 
 // ========== PANNEAU EXPORT LATÉRAL ==========
@@ -2113,10 +2189,10 @@ function initConnectionMonitor() {
 function updateConnectionBadge() {
     const badge = document.getElementById('connectionBadge');
     const text = badge.querySelector('.connection-text');
+    const now = Date.now();
 
     if (navigator.onLine) {
         // En ligne, mais vérifier si connexion stable
-        const now = Date.now();
         const timeSinceLastCheck = now - lastConnectionCheck;
 
         if (timeSinceLastCheck > 10000) {
@@ -2126,6 +2202,7 @@ function updateConnectionBadge() {
         } else {
             badge.classList.remove('offline', 'disconnected');
             text.textContent = 'Connecté';
+            lastConnectionSuccess = now;
         }
 
         lastConnectionCheck = now;
@@ -2134,6 +2211,20 @@ function updateConnectionBadge() {
         badge.classList.add('disconnected');
         text.textContent = 'Hors ligne';
     }
+
+    // Mettre à jour tooltip avec timestamp
+    const timeSinceSuccess = Math.floor((now - lastConnectionSuccess) / 1000);
+    let tooltipText = '';
+
+    if (timeSinceSuccess < 60) {
+        tooltipText = `Dernier succès : il y a ${timeSinceSuccess}s`;
+    } else if (timeSinceSuccess < 3600) {
+        tooltipText = `Dernier succès : il y a ${Math.floor(timeSinceSuccess / 60)}min`;
+    } else {
+        tooltipText = `Dernier succès : il y a ${Math.floor(timeSinceSuccess / 3600)}h`;
+    }
+
+    badge.setAttribute('title', tooltipText);
 }
 
 // ========== BOUTONS TACTILES MOBILES ==========
@@ -2174,9 +2265,337 @@ function toggleFullscreenMode() {
     vibrate(50);
 }
 
-// ========== AMÉLIORATION EXPORT AVEC HORODATAGE ==========
-// Mettre à jour addPointage pour ajouter un timestamp
-const originalAddPointage = addPointage;
+function toggleCompactMode() {
+    mobileBarCompact = !mobileBarCompact;
+
+    const bar = document.getElementById('mobileActions');
+
+    if (mobileBarCompact) {
+        bar.classList.add('compact');
+        showToast('📏 Mode compact activé');
+    } else {
+        bar.classList.remove('compact');
+        showToast('📏 Mode normal');
+    }
+
+    vibrate(30);
+}
+
+function toggleMobileAdvanced() {
+    const advanced = document.getElementById('mobileActionsAdvanced');
+    const isVisible = advanced.style.display !== 'none';
+
+    if (isVisible) {
+        advanced.style.display = 'none';
+    } else {
+        advanced.style.display = 'grid';
+    }
+
+    vibrate(20);
+}
+
+function updatePreferencesReminder() {
+    const reminder = document.getElementById('preferencesReminder');
+    if (!reminder) return;
+
+    const prefs = loadPreferencesFromStorage();
+    let parts = [];
+
+    // Mode scan
+    if (cameraScanActive) {
+        parts.push('📸 Scan Caméra');
+    } else {
+        parts.push('📷 Scan 2D');
+    }
+
+    // Format export par défaut
+    parts.push('📊 Export CSV');
+
+    // Dernier backup
+    if (prefs.lastBackup) {
+        const backupDate = new Date(prefs.lastBackup);
+        const now = new Date();
+        const diffHours = Math.floor((now - backupDate) / (1000 * 60 * 60));
+
+        if (diffHours < 24) {
+            parts.push(`💾 Backup: il y a ${diffHours}h`);
+        } else {
+            const diffDays = Math.floor(diffHours / 24);
+            parts.push(`💾 Backup: il y a ${diffDays}j`);
+        }
+    } else {
+        parts.push('💾 Aucun backup');
+    }
+
+    reminder.textContent = parts.join(' · ');
+}
+
+function initMobileBarAutoHide() {
+    window.addEventListener('scroll', () => {
+        if (!mobileBarAutoHide) return;
+
+        const currentScrollY = window.scrollY;
+        const bar = document.getElementById('mobileActions');
+
+        if (currentScrollY > lastScrollY && currentScrollY > 100) {
+            // Scroll vers le bas : cacher
+            bar.classList.add('hidden');
+            mobileBarHidden = true;
+        } else {
+            // Scroll vers le haut : afficher
+            bar.classList.remove('hidden');
+            mobileBarHidden = false;
+        }
+
+        lastScrollY = currentScrollY;
+    });
+
+    // Afficher au focus d'un input
+    document.addEventListener('focusin', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            const bar = document.getElementById('mobileActions');
+            bar.classList.add('hidden');
+            mobileBarHidden = true;
+        }
+    });
+
+    document.addEventListener('focusout', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            const bar = document.getElementById('mobileActions');
+            bar.classList.remove('hidden');
+            mobileBarHidden = false;
+        }
+    });
+}
+
+// ========== SAUVEGARDE & RESTAURATION ==========
+let pendingRestoreData = null;
+let lastExportedFile = null;
+
+function saveFullBackup() {
+    const backup = {
+        version: '1.0',
+        export_date: new Date().toISOString(),
+        data: {
+            pointages: loadPointagesFromStorage(),
+            figurants: loadFigurantsFromStorage(),
+            listeTechnique: loadListeTechniqueFromStorage(),
+            preferences: loadPreferencesFromStorage()
+        }
+    };
+
+    const jsonString = JSON.stringify(backup, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const filename = `KRAKEN_Backup_${formatDate(new Date())}_${Date.now()}.json`;
+
+    // Sauvegarder référence pour partage
+    lastExportedFile = { blob, filename };
+
+    // Télécharger
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Mettre à jour l'info
+    updateLastBackupInfo();
+
+    // Afficher bouton partager
+    document.getElementById('shareBtn').style.display = 'block';
+
+    showToast('✅ Sauvegarde créée');
+    vibrate(50);
+}
+
+function restoreFromBackup(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const backup = JSON.parse(e.target.result);
+
+            // Validation basique
+            if (!backup.data || !backup.data.pointages) {
+                throw new Error('Format de sauvegarde invalide');
+            }
+
+            // Stocker temporairement
+            pendingRestoreData = backup;
+
+            // Afficher preview
+            showRestorePreview(backup);
+
+        } catch (error) {
+            console.error('Erreur lecture backup:', error);
+            showToast('⚠️ Fichier de sauvegarde invalide', true);
+        }
+    };
+
+    reader.readAsText(file);
+
+    // Reset input
+    event.target.value = '';
+}
+
+function showRestorePreview(backup) {
+    const data = backup.data;
+
+    // Compter éléments
+    const pointagesCount = Object.keys(data.pointages || {}).reduce((sum, date) => {
+        return sum + (data.pointages[date] || []).length;
+    }, 0);
+
+    const figurantsCount = Object.keys(data.figurants || {}).length;
+    const listeTechniqueCount = (data.listeTechnique || []).length;
+
+    // Dates de pointages
+    const dates = Object.keys(data.pointages || {}).sort();
+    const dateRange = dates.length > 0 ? `${dates[0]} → ${dates[dates.length - 1]}` : 'Aucune';
+
+    const html = `
+        <div style="padding: 16px;">
+            <div style="background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                <strong style="color: #ff9800;">⚠️ Attention</strong><br>
+                <span style="font-size: 14px;">Cette opération écrasera toutes les données actuelles.</span>
+            </div>
+
+            <div style="background: var(--bg-secondary); padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                <h4 style="margin-bottom: 12px;">Contenu de la sauvegarde :</h4>
+                <div style="display: grid; gap: 8px; font-size: 14px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>📅 Date sauvegarde :</span>
+                        <strong>${new Date(backup.export_date).toLocaleString('fr-FR')}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>📊 Pointages :</span>
+                        <strong>${pointagesCount} entrées</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>📅 Période :</span>
+                        <strong>${dateRange}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>🎭 Figurants :</span>
+                        <strong>${figurantsCount} jours</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>👥 Liste technique :</span>
+                        <strong>${listeTechniqueCount} personnes</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div style="background: var(--bg-secondary); padding: 16px; border-radius: 8px;">
+                <h4 style="margin-bottom: 12px;">Données actuelles :</h4>
+                <div style="display: grid; gap: 8px; font-size: 14px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>📊 Pointages :</span>
+                        <strong>${Object.keys(loadPointagesFromStorage()).reduce((sum, date) => sum + loadPointagesFromStorage()[date].length, 0)} entrées</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>👥 Liste technique :</span>
+                        <strong>${listeTechnique.length} personnes</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('restorePreviewContent').innerHTML = html;
+    document.getElementById('restorePreviewModal').classList.add('active');
+}
+
+function closeRestorePreview() {
+    document.getElementById('restorePreviewModal').classList.remove('active');
+    pendingRestoreData = null;
+}
+
+function confirmRestore() {
+    if (!pendingRestoreData) {
+        showToast('⚠️ Aucune donnée à restaurer', true);
+        return;
+    }
+
+    const data = pendingRestoreData.data;
+
+    // Restaurer chaque élément
+    localStorage.setItem(CONFIG.STORAGE_KEYS.POINTAGES, JSON.stringify(data.pointages || {}));
+    localStorage.setItem(CONFIG.STORAGE_KEYS.FIGURANTS, JSON.stringify(data.figurants || {}));
+    localStorage.setItem(CONFIG.STORAGE_KEYS.LISTE_TECHNIQUE, JSON.stringify(data.listeTechnique || []));
+    if (data.preferences) {
+        localStorage.setItem(CONFIG.STORAGE_KEYS.PREFERENCES, JSON.stringify(data.preferences));
+    }
+
+    closeRestorePreview();
+    showToast('✅ Données restaurées. Rechargement...');
+    vibrate(50);
+
+    // Recharger la page après 1 seconde
+    setTimeout(() => {
+        location.reload();
+    }, 1000);
+}
+
+function updateLastBackupInfo() {
+    const info = document.getElementById('lastBackupInfo');
+    const now = new Date().toLocaleString('fr-FR');
+    info.textContent = `Dernière sauvegarde : ${now}`;
+
+    // Sauvegarder dans préférences
+    const prefs = loadPreferencesFromStorage();
+    prefs.lastBackup = new Date().toISOString();
+    savePreferencesToStorage(prefs);
+}
+
+// ========== WEB SHARE API ==========
+async function shareLastExport() {
+    if (!lastExportedFile) {
+        showToast('⚠️ Aucun fichier à partager', true);
+        return;
+    }
+
+    const { blob, filename } = lastExportedFile;
+
+    // Vérifier support Web Share API Level 2 (fichiers)
+    if (navigator.canShare && navigator.canShare({ files: [new File([blob], filename)] })) {
+        try {
+            const file = new File([blob], filename, { type: 'application/json' });
+
+            await navigator.share({
+                title: 'KRAKEN - Sauvegarde',
+                text: 'Sauvegarde complète des données KRAKEN',
+                files: [file]
+            });
+
+            showToast('✅ Fichier partagé');
+            vibrate(30);
+
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('Erreur partage:', error);
+                showToast('⚠️ Erreur lors du partage', true);
+            }
+        }
+    } else {
+        // Fallback : télécharger à nouveau
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showToast('📥 Téléchargement lancé (partage non supporté)');
+    }
+}
 
 // ========== INITIALISATION ==========
 function init() {
@@ -2207,6 +2626,12 @@ function init() {
 
     // Initialiser le badge de connexion
     initConnectionMonitor();
+
+    // Initialiser auto-hide barre mobile
+    initMobileBarAutoHide();
+
+    // Mettre à jour rappel préférences
+    updatePreferencesReminder();
 
     // Focus initial
     refocusScannerInput();
