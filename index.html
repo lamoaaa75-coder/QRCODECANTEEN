@@ -577,6 +577,10 @@
             overflow-y: auto;
         }
 
+        .export-preview-content {
+            max-width: 800px;
+        }
+
         .modal-header {
             display: flex;
             justify-content: space-between;
@@ -644,6 +648,34 @@
             outline-offset: 2px;
         }
 
+        .quick-add-label {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            cursor: pointer;
+            padding: var(--spacing-md);
+            background: var(--accent-soft);
+            border-radius: var(--radius-md);
+            margin-top: var(--spacing-md);
+            transition: all 0.2s;
+        }
+
+        .quick-add-label:hover {
+            background: rgba(0, 136, 255, 0.15);
+        }
+
+        .quick-add-label input[type="checkbox"] {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+        }
+
+        .quick-add-label span {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
         .modal-actions {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -679,6 +711,172 @@
 
         .btn-primary:hover {
             background: var(--accent-hover);
+        }
+
+        .undo-btn {
+            margin-top: var(--spacing-md);
+            width: 100%;
+            padding: var(--spacing-md);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 44px;
+        }
+
+        .undo-btn:hover:not(:disabled) {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .undo-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ========== EXPORT PREVIEW ========== */
+        .export-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .export-stat-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            text-align: center;
+        }
+
+        .export-stat-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-xs);
+        }
+
+        .export-stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .export-breakdown {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .export-breakdown-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: var(--spacing-xs) 0;
+            font-size: 14px;
+        }
+
+        .export-breakdown-category {
+            font-weight: 600;
+        }
+
+        .export-breakdown-count {
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .export-duplicates {
+            background: rgba(255, 193, 7, 0.1);
+            border: 1px solid rgba(255, 193, 7, 0.3);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .export-duplicates-header {
+            font-weight: 700;
+            color: #ff9800;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .export-duplicates-list {
+            font-size: 14px;
+            color: var(--text-secondary);
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .export-duplicate-item {
+            padding: var(--spacing-xs) 0;
+            border-bottom: 1px solid rgba(255, 193, 7, 0.2);
+        }
+
+        .export-duplicate-item:last-child {
+            border-bottom: none;
+        }
+
+        .export-preview-table-container {
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .export-preview-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .export-preview-table {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .export-preview-table table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .export-preview-table th {
+            position: sticky;
+            top: 0;
+            background: var(--bg-card);
+            border-bottom: 2px solid var(--border);
+            padding: var(--spacing-sm);
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .export-preview-table td {
+            padding: var(--spacing-sm);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .export-preview-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .export-preview-table tr.duplicate-row {
+            background: rgba(255, 193, 7, 0.1);
+        }
+
+        .export-options {
+            margin-bottom: var(--spacing-lg);
         }
 
         /* ========== EXPORT SECTION ========== */
@@ -924,6 +1122,10 @@
                 <div class="stat-value" id="statsTotal" aria-live="polite">0</div>
             </div>
         </div>
+
+        <button class="undo-btn" id="undoBtn" onclick="undoLastAction()" disabled title="Annuler la dernière action (Ctrl+Z)">
+            ↶ Annuler
+        </button>
     </header>
 
     <!-- SCANNER INPUT -->
@@ -1073,8 +1275,8 @@
                     <input type="date" id="exportToDate" class="form-input">
                 </div>
             </div>
-            <button class="btn btn-export" onclick="exportCSV()">
-                Télécharger CSV
+            <button class="btn btn-export" onclick="showExportPreview()">
+                Prévisualiser et Exporter
             </button>
         </div>
 
@@ -1124,9 +1326,74 @@
                 <input type="text" id="modalInviteDe" class="form-input" placeholder="Invité de" autocomplete="off">
             </div>
 
+            <div class="form-group">
+                <label class="quick-add-label">
+                    <input type="checkbox" id="quickAddCheckbox" onchange="toggleQuickAddMode()" class="quick-add-checkbox">
+                    <span>⚡ Mode rajout rapide (saisie en rafale)</span>
+                </label>
+            </div>
+
             <div class="modal-actions">
                 <button class="btn btn-cancel" onclick="closeInputModal()">Annuler</button>
                 <button class="btn btn-primary" onclick="saveFromModal()">Valider</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PRÉVISUALISATION EXPORT -->
+    <div class="modal" id="exportPreviewModal">
+        <div class="modal-content export-preview-content">
+            <div class="modal-header">
+                <h2 class="modal-title">📊 Prévisualisation Export</h2>
+                <button class="modal-close" onclick="closeExportPreview()" aria-label="Fermer">×</button>
+            </div>
+
+            <!-- Statistiques -->
+            <div class="export-stats">
+                <div class="export-stat-item">
+                    <div class="export-stat-label">Total entrées</div>
+                    <div class="export-stat-value" id="exportStatsTotal">0</div>
+                </div>
+                <div class="export-stat-item">
+                    <div class="export-stat-label">Personnes uniques</div>
+                    <div class="export-stat-value" id="exportStatsUnique">0</div>
+                </div>
+                <div class="export-stat-item">
+                    <div class="export-stat-label">Période</div>
+                    <div class="export-stat-value" id="exportStatsPeriod">-</div>
+                </div>
+            </div>
+
+            <!-- Breakdown par catégorie -->
+            <div class="export-breakdown" id="exportBreakdown"></div>
+
+            <!-- Alerte doublons -->
+            <div class="export-duplicates hidden" id="exportDuplicates">
+                <div class="export-duplicates-header">⚠️ Doublons détectés</div>
+                <div class="export-duplicates-list" id="exportDuplicatesList"></div>
+            </div>
+
+            <!-- Tableau de prévisualisation -->
+            <div class="export-preview-table-container">
+                <div class="export-preview-label">Aperçu des données (premières lignes)</div>
+                <div class="export-preview-table" id="exportPreviewTable"></div>
+            </div>
+
+            <!-- Options d'export -->
+            <div class="export-options">
+                <div class="form-group">
+                    <label for="exportEncoding" class="form-label">Encodage</label>
+                    <select id="exportEncoding" class="form-input">
+                        <option value="utf-8">UTF-8 (recommandé)</option>
+                        <option value="windows-1252">Windows-1252 (Excel Windows)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeExportPreview()">Annuler</button>
+                <button class="btn btn-primary" onclick="confirmExport()">📥 Télécharger CSV</button>
             </div>
         </div>
     </div>

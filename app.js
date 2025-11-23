@@ -26,6 +26,8 @@ let lastScanTime = 0;
 let currentEditId = null;
 let modalCategory = null;
 let scanModeActive = true; // Mode scan activé par défaut
+let quickAddMode = false; // Mode rajout rapide
+let actionHistory = []; // Historique des actions (max 10)
 
 // ========== UTILITAIRES ==========
 function generateId() {
@@ -453,7 +455,136 @@ function closeInputModal() {
     document.getElementById('inputModal').classList.remove('active');
     currentEditId = null;
     modalCategory = null;
+    quickAddMode = false; // Désactiver le mode rajout rapide à la fermeture
+    document.getElementById('quickAddCheckbox').checked = false; // Reset checkbox
     refocusScannerInput();
+}
+
+function toggleQuickAddMode() {
+    quickAddMode = document.getElementById('quickAddCheckbox').checked;
+    if (quickAddMode) {
+        showToast('⚡ Mode rajout rapide activé');
+    } else {
+        showToast('Mode normal activé');
+    }
+}
+
+function clearModalInputs() {
+    document.getElementById('modalNom').value = '';
+    document.getElementById('modalPrenom').value = '';
+    document.getElementById('modalDept').value = '';
+    document.getElementById('modalSociete').value = '';
+    document.getElementById('modalInviteDe').value = '';
+}
+
+// ========== SAISIE ASSISTÉE ==========
+function autoCompleteFromListeTechnique(nom, prenom) {
+    // Chercher dans la liste technique
+    const matches = listeTechnique.filter(p => {
+        const nomMatch = p.nom.toUpperCase() === nom.toUpperCase();
+        const prenomMatch = !prenom || p.prenom.toLowerCase() === prenom.toLowerCase();
+        return nomMatch && prenomMatch;
+    });
+
+    if (matches.length === 1) {
+        // Un seul match : auto-compléter
+        const person = matches[0];
+        document.getElementById('modalPrenom').value = person.prenom;
+        if (document.getElementById('modalDept').parentElement.style.display !== 'none') {
+            document.getElementById('modalDept').value = person.departement || '';
+        }
+        showToast(`✓ Auto-complété depuis liste technique`, false);
+        return person;
+    } else if (matches.length > 1) {
+        // Homonymes détectés
+        showToast(`⚠️ ${matches.length} homonymes trouvés dans la liste`, true);
+        return null;
+    }
+    return null;
+}
+
+function detectDuplicatesInOtherDates(pointage) {
+    // Vérifier si existe dans d'autres dates
+    const allPointages = loadPointagesFromStorage();
+    const duplicates = [];
+
+    Object.keys(allPointages).forEach(date => {
+        if (date !== currentWorkingDate) {
+            allPointages[date].forEach(p => {
+                if (p.nom === pointage.nom && p.prenom === pointage.prenom && p.categorie === pointage.categorie) {
+                    duplicates.push(date);
+                }
+            });
+        }
+    });
+
+    return duplicates;
+}
+
+function addToHistory(action) {
+    actionHistory.unshift({
+        id: generateId(),
+        timestamp: Date.now(),
+        date: currentWorkingDate,
+        action: action.type,
+        data: action.data
+    });
+
+    // Garder seulement les 10 dernières actions
+    if (actionHistory.length > 10) {
+        actionHistory = actionHistory.slice(0, 10);
+    }
+
+    updateHistoryDisplay();
+}
+
+function undoLastAction() {
+    if (actionHistory.length === 0) {
+        showToast('⚠️ Aucune action à annuler', true);
+        return;
+    }
+
+    const lastAction = actionHistory.shift();
+
+    // Annuler selon le type d'action
+    if (lastAction.action === 'add') {
+        // Retirer le pointage ajouté
+        const pointages = getPointagesForDate(lastAction.date);
+        const index = pointages.findIndex(p => p.id === lastAction.data.id);
+        if (index !== -1) {
+            pointages.splice(index, 1);
+            savePointagesForDate(lastAction.date, pointages);
+            showToast('✅ Action annulée');
+            renderAll();
+        }
+    } else if (lastAction.action === 'delete') {
+        // Restaurer le pointage supprimé
+        const pointages = getPointagesForDate(lastAction.date);
+        pointages.push(lastAction.data);
+        savePointagesForDate(lastAction.date, pointages);
+        showToast('✅ Suppression annulée');
+        renderAll();
+    } else if (lastAction.action === 'edit') {
+        // Restaurer l'ancienne valeur
+        const pointages = getPointagesForDate(lastAction.date);
+        const index = pointages.findIndex(p => p.id === lastAction.data.id);
+        if (index !== -1) {
+            pointages[index] = lastAction.data.oldValue;
+            savePointagesForDate(lastAction.date, pointages);
+            showToast('✅ Modification annulée');
+            renderAll();
+        }
+    }
+
+    updateHistoryDisplay();
+}
+
+function updateHistoryDisplay() {
+    const undoBtn = document.getElementById('undoBtn');
+    if (undoBtn) {
+        undoBtn.disabled = actionHistory.length === 0;
+    }
+    console.log('Historique:', actionHistory.length, 'actions');
 }
 
 function saveFromModal() {
@@ -485,30 +616,64 @@ function saveFromModal() {
         origine: 'manuel'
     };
 
+    // Auto-compléter poste depuis liste technique si équipe
+    if (modalCategory === 'equipe' && !pointage.poste) {
+        const match = listeTechnique.find(p =>
+            p.nom.toUpperCase() === nom && p.prenom.toLowerCase() === prenom.toLowerCase()
+        );
+        if (match) {
+            pointage.poste = match.poste || '';
+        }
+    }
+
     if (currentEditId) {
         // Mode édition
         updatePointage(currentEditId, pointage);
     } else {
         // Mode ajout
-        addPointage(pointage);
+        const success = addPointage(pointage);
+
+        if (success && quickAddMode) {
+            // Mode rajout rapide : vider et refocus
+            clearModalInputs();
+            setTimeout(() => {
+                document.getElementById('modalNom').focus();
+            }, 100);
+            return; // Ne pas fermer la modal
+        }
     }
 
-    closeInputModal();
+    if (!quickAddMode) {
+        closeInputModal();
+    }
 }
 
 function addPointage(pointage) {
     const pointages = getPointagesForDate(currentWorkingDate);
 
-    // Vérifier doublon
+    // Vérifier doublon jour actuel
     if (isDuplicate(pointage, pointages)) {
         showToast('⚠️ Déjà pointé aujourd\'hui', true);
         return false;
+    }
+
+    // Détecter doublons dans autres dates (alerte info)
+    const duplicatesInOtherDates = detectDuplicatesInOtherDates(pointage);
+    if (duplicatesInOtherDates.length > 0) {
+        console.log('⚠️ Personne déjà pointée les:', duplicatesInOtherDates.join(', '));
+        showToast(`ℹ️ Déjà pointé(e) le ${duplicatesInOtherDates[0]}`, false);
     }
 
     pointage.id = generateId();
     pointage.date = currentWorkingDate;
     pointages.push(pointage);
     savePointagesForDate(currentWorkingDate, pointages);
+
+    // Ajouter à l'historique
+    addToHistory({
+        type: 'add',
+        data: { ...pointage }
+    });
 
     const nom = pointage.prenom ? `${pointage.prenom} ${pointage.nom}` : pointage.nom;
     showToast(`✅ ${nom} pointé(e)`);
@@ -522,8 +687,17 @@ function updatePointage(id, updatedData) {
     const index = pointages.findIndex(p => p.id === id);
 
     if (index !== -1) {
+        const oldValue = { ...pointages[index] };
+
         pointages[index] = { ...pointages[index], ...updatedData };
         savePointagesForDate(currentWorkingDate, pointages);
+
+        // Ajouter à l'historique
+        addToHistory({
+            type: 'edit',
+            data: { id, oldValue, newValue: { ...pointages[index] } }
+        });
+
         showToast('✅ Modifié');
         renderAll();
     }
@@ -573,6 +747,12 @@ function deletePointage(id) {
     const nom = pointage.prenom ? `${pointage.prenom} ${pointage.nom}` : pointage.nom;
 
     if (confirm(`Supprimer ${nom} ?`)) {
+        // Ajouter à l'historique AVANT la suppression
+        addToHistory({
+            type: 'delete',
+            data: { ...pointage }
+        });
+
         pointages.splice(index, 1);
         savePointagesForDate(currentWorkingDate, pointages);
         showToast(`❌ ${nom} retiré(e)`);
@@ -1054,6 +1234,278 @@ function exportCSV() {
     exportCSVForRange(fromDate, toDate);
 }
 
+// ========== EXPORT PREVIEW ==========
+let currentExportData = null;
+
+function showExportPreview() {
+    const fromDate = document.getElementById('exportFromDate').value;
+    const toDate = document.getElementById('exportToDate').value;
+
+    if (!fromDate || !toDate) {
+        showToast('⚠️ Sélectionnez les dates', true);
+        return;
+    }
+
+    if (fromDate > toDate) {
+        showToast('⚠️ Date de début après date de fin', true);
+        return;
+    }
+
+    // Générer les données d'export
+    currentExportData = generateExportData(fromDate, toDate);
+
+    // Calculer statistiques
+    const stats = calculateExportStats(currentExportData);
+
+    // Détecter doublons
+    const duplicates = detectExportDuplicates(currentExportData);
+
+    // Remplir le modal
+    document.getElementById('exportStatsTotal').textContent = stats.total;
+    document.getElementById('exportStatsUnique').textContent = stats.unique;
+    document.getElementById('exportStatsPeriod').textContent = `${fromDate} → ${toDate}`;
+
+    // Breakdown par catégorie
+    const breakdownHtml = Object.entries(stats.byCategory)
+        .map(([cat, count]) => `
+            <div class="export-breakdown-item">
+                <span class="export-breakdown-category">${cat}</span>
+                <span class="export-breakdown-count">${count}</span>
+            </div>
+        `).join('');
+    document.getElementById('exportBreakdown').innerHTML = breakdownHtml;
+
+    // Afficher doublons s'il y en a
+    const duplicatesEl = document.getElementById('exportDuplicates');
+    if (duplicates.length > 0) {
+        duplicatesEl.classList.remove('hidden');
+        const duplicatesHtml = duplicates.map(d => `
+            <div class="export-duplicate-item">
+                ${d.nom} ${d.prenom} (${d.categorie}) - ${d.dates.join(', ')}
+            </div>
+        `).join('');
+        document.getElementById('exportDuplicatesList').innerHTML = duplicatesHtml;
+    } else {
+        duplicatesEl.classList.add('hidden');
+    }
+
+    // Table de prévisualisation (premières 20 lignes)
+    const previewRows = currentExportData.slice(0, 20);
+    const tableHtml = `
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Catégorie</th>
+                    <th>Nom</th>
+                    <th>Prénom</th>
+                    <th>Département</th>
+                    <th>Poste</th>
+                    <th>Société</th>
+                    <th>Invité de</th>
+                    <th>Origine</th>
+                    <th>Quantité</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${previewRows.map(row => `
+                    <tr>
+                        <td>${row.date}</td>
+                        <td>${row.categorie}</td>
+                        <td>${row.nom}</td>
+                        <td>${row.prenom}</td>
+                        <td>${row.departement}</td>
+                        <td>${row.poste}</td>
+                        <td>${row.societe}</td>
+                        <td>${row.inviteDe}</td>
+                        <td>${row.origine}</td>
+                        <td>${row.quantite}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+    document.getElementById('exportPreviewTable').innerHTML = tableHtml;
+
+    // Afficher le modal
+    document.getElementById('exportPreviewModal').classList.add('active');
+}
+
+function generateExportData(fromDate, toDate) {
+    const allPointages = loadPointagesFromStorage();
+    const allFigurants = loadFigurantsFromStorage();
+    const exportData = [];
+
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+
+    for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+        const dateStr = formatDate(d);
+        const pointages = allPointages[dateStr] || [];
+        const figurantCount = allFigurants[dateStr] || 0;
+
+        pointages.forEach(p => {
+            let poste = p.poste || '';
+            if (!poste && p.categorie === CONFIG.CATEGORIES.EQUIPE) {
+                const person = listeTechnique.find(lt =>
+                    lt.nom === p.nom && lt.prenom === p.prenom
+                );
+                if (person) poste = person.poste || '';
+            }
+
+            exportData.push({
+                date: dateStr,
+                categorie: p.categorie,
+                nom: p.nom || '',
+                prenom: p.prenom || '',
+                departement: p.departement || '',
+                poste: poste,
+                societe: p.societe || '',
+                inviteDe: p.inviteDe || '',
+                origine: p.origine,
+                quantite: 1
+            });
+        });
+
+        if (figurantCount > 0) {
+            exportData.push({
+                date: dateStr,
+                categorie: 'figurants',
+                nom: '',
+                prenom: '',
+                departement: '',
+                poste: '',
+                societe: '',
+                inviteDe: '',
+                origine: 'compteur',
+                quantite: figurantCount
+            });
+        }
+    }
+
+    // Trier
+    exportData.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        if (a.categorie !== b.categorie) return a.categorie.localeCompare(b.categorie);
+        if (a.departement !== b.departement) return a.departement.localeCompare(b.departement);
+        if (a.nom !== b.nom) return a.nom.localeCompare(b.nom);
+        return a.prenom.localeCompare(b.prenom);
+    });
+
+    return exportData;
+}
+
+function calculateExportStats(exportData) {
+    const stats = {
+        total: exportData.length,
+        unique: 0,
+        byCategory: {}
+    };
+
+    // Compter personnes uniques (par nom+prenom)
+    const uniquePeople = new Set();
+    exportData.forEach(row => {
+        if (row.nom || row.prenom) {
+            uniquePeople.add(`${row.nom}|${row.prenom}`);
+        }
+
+        // Compter par catégorie
+        stats.byCategory[row.categorie] = (stats.byCategory[row.categorie] || 0) + 1;
+    });
+
+    stats.unique = uniquePeople.size;
+
+    return stats;
+}
+
+function detectExportDuplicates(exportData) {
+    const duplicates = [];
+    const seen = {};
+
+    exportData.forEach(row => {
+        if (row.nom || row.prenom) {
+            const key = `${row.nom}|${row.prenom}|${row.categorie}`;
+            if (!seen[key]) {
+                seen[key] = {
+                    nom: row.nom,
+                    prenom: row.prenom,
+                    categorie: row.categorie,
+                    dates: []
+                };
+            }
+            if (!seen[key].dates.includes(row.date)) {
+                seen[key].dates.push(row.date);
+            }
+        }
+    });
+
+    // Garder seulement ceux qui apparaissent plusieurs fois
+    Object.values(seen).forEach(item => {
+        if (item.dates.length > 1) {
+            duplicates.push(item);
+        }
+    });
+
+    return duplicates;
+}
+
+function closeExportPreview() {
+    document.getElementById('exportPreviewModal').classList.remove('active');
+    currentExportData = null;
+}
+
+function confirmExport() {
+    if (!currentExportData || currentExportData.length === 0) {
+        showToast('⚠️ Aucune donnée à exporter', true);
+        return;
+    }
+
+    const encoding = document.getElementById('exportEncoding').value;
+    const fromDate = document.getElementById('exportFromDate').value;
+    const toDate = document.getElementById('exportToDate').value;
+
+    // Générer CSV
+    let csv = 'date;categorie;nom;prenom;departement;poste;societe;invite_de;origine;quantite\n';
+    currentExportData.forEach(row => {
+        csv += `${row.date};${row.categorie};${row.nom};${row.prenom};${row.departement};${row.poste};${row.societe};${row.inviteDe};${row.origine};${row.quantite}\n`;
+    });
+
+    // Télécharger avec encodage
+    downloadCSVWithEncoding(csv, `KRAKEN_Pointage_${fromDate}_${toDate}.csv`, encoding);
+
+    // Fermer le modal
+    closeExportPreview();
+}
+
+function downloadCSVWithEncoding(csvContent, filename, encoding = 'utf-8') {
+    let blob;
+
+    if (encoding === 'windows-1252') {
+        // Pour Windows-1252, on utilise l'encodage latin1
+        const bytes = new Uint8Array(csvContent.length);
+        for (let i = 0; i < csvContent.length; i++) {
+            bytes[i] = csvContent.charCodeAt(i) & 0xff;
+        }
+        blob = new Blob([bytes], { type: 'text/csv;charset=windows-1252;' });
+    } else {
+        // UTF-8 par défaut
+        blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    }
+
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showToast('✅ CSV téléchargé');
+}
+
 // ========== ACTIONS ==========
 function resetCurrentDay() {
     if (!confirm(`Réinitialiser tous les pointages du ${currentWorkingDate} ?`)) {
@@ -1199,10 +1651,25 @@ function setupEventListeners() {
         e.target.value = ''; // Reset pour permettre re-sélection du même fichier
     });
 
-    // Modal : Escape pour fermer
+    // Raccourcis clavier
     document.addEventListener('keydown', (e) => {
+        // Escape : fermer modals
         if (e.key === 'Escape') {
             closeInputModal();
+            closeExportPreview();
+        }
+
+        // Ctrl+Z : annuler dernière action
+        if (e.ctrlKey && e.key === 'z') {
+            e.preventDefault();
+            undoLastAction();
+        }
+
+        // Ctrl+1 à Ctrl+6 : basculer entre onglets
+        if (e.ctrlKey && e.key >= '1' && e.key <= '6') {
+            e.preventDefault();
+            const tabs = ['equipe', 'renforts', 'invites', 'securite', 'cantine', 'figurants'];
+            switchTab(tabs[parseInt(e.key) - 1]);
         }
     });
 
@@ -1211,6 +1678,27 @@ function setupEventListeners() {
         if (e.target.id === 'inputModal') {
             closeInputModal();
         }
+    });
+
+    document.getElementById('exportPreviewModal').addEventListener('click', (e) => {
+        if (e.target.id === 'exportPreviewModal') {
+            closeExportPreview();
+        }
+    });
+
+    // Auto-complétion depuis liste technique (sur input nom)
+    let autoCompleteTimeout;
+    document.getElementById('modalNom').addEventListener('input', (e) => {
+        clearTimeout(autoCompleteTimeout);
+        autoCompleteTimeout = setTimeout(() => {
+            const nom = e.target.value.trim().toUpperCase();
+            const prenom = document.getElementById('modalPrenom').value.trim();
+
+            // Seulement auto-compléter si on a au moins 2 caractères et que c'est l'onglet équipe
+            if (nom.length >= 2 && modalCategory === 'equipe' && listeTechnique.length > 0) {
+                autoCompleteFromListeTechnique(nom, prenom);
+            }
+        }, 500); // Debounce de 500ms
     });
 
     // Refocus périodique sur scanner
@@ -1242,6 +1730,9 @@ function init() {
     const scanStatus = document.getElementById('scanStatus');
     scanStatus.textContent = '✓ Mode scan activé';
     scanStatus.style.color = 'var(--accent)';
+
+    // Initialiser le bouton undo (désactivé au départ)
+    updateHistoryDisplay();
 
     // Focus initial
     refocusScannerInput();
